@@ -1,0 +1,83 @@
+# ===========================
+# SEAM Project .gitignore
+# ===========================
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# ----- Environment variables -----
+.env
+.env.local
+.env.*.local
+
+# ----- IDE / Editor -----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ----- Node / Frontend -----
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.npm
+.eslintcache
+
+# ----- ChromaDB -----
+chroma_data/
+*.chroma/
+
+# ----- Ollama -----
+# Model files are managed by Ollama, not committed
+*.gguf
+*.bin
+
+# ----- Docker -----
+docker-compose.override.yml
+
+# ----- Testing -----
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ----- OS files -----
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- Misc -----
+*.bak
+*.tmp
+*.temp
+.cache/
