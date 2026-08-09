@@ -27,6 +27,10 @@
 | FR-2.4 | The Supervisor SHALL trigger rework cycles when QA reports failures |
 | FR-2.5 | The Supervisor SHALL maintain a state machine tracking overall workflow progress |
 | FR-2.6 | The Supervisor SHALL NOT use a static sequential pipeline |
+| FR-2.7 | The QA Agent SHALL generate or identify appropriate tests for generated software |
+| FR-2.8 | The QA Agent SHALL analyse generated code for correctness, maintainability and common implementation defects |
+| FR-2.9 | The QA Agent SHALL produce structured quality findings and a quality assessment for generated artifacts |
+| FR-2.10 | The QA Agent SHALL provide structured failure information to the Supervisor/Orchestrator Agent when quality criteria are not satisfied |
 
 ### FR-3: RAG Infrastructure
 
@@ -62,6 +66,22 @@
 | FR-6.1 | The backend SHALL expose RESTful endpoints for project management |
 | FR-6.2 | The backend SHALL support WebSocket connections for real-time status updates |
 | FR-6.3 | The backend SHALL validate all inputs using Pydantic models |
+
+### FR-7: Evaluation
+
+| ID | Requirement |
+|----|-------------|
+| FR-7.1 | The system SHALL support execution of defined evaluation experiments on software engineering benchmark tasks |
+| FR-7.2 | The system SHALL collect predefined evaluation metrics |
+| FR-7.3 | The evaluation process SHALL support comparison with defined baseline approaches |
+| FR-7.4 | Evaluation results SHALL be stored in a structured format for analysis and reporting |
+
+### FR-8: Deployment
+
+| ID | Requirement |
+|----|-------------|
+| FR-8.1 | The system SHALL support containerised deployment using Docker |
+| FR-8.2 | The deployment configuration SHALL define the required services and dependencies required to reproduce the system environment |
 
 ## 2. Non-Functional Requirements
 
@@ -107,6 +127,13 @@
 |----|-------------|
 | NFR-6.1 | Experiments SHALL be reproducible given the same inputs and model versions |
 | NFR-6.2 | All configurations SHALL be captured in version-controlled files |
+
+### NFR-7: Security
+
+| ID | Requirement |
+|----|-------------|
+| NFR-7.1 | User-provided inputs SHALL be validated before inclusion in LLM prompts or downstream processing |
+| NFR-7.2 | Secrets, API keys and authentication credentials SHALL NOT be stored in source code or exposed through application logs |
 
 ## 3. Constraints
 

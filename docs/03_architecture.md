@@ -45,6 +45,7 @@ graph TB
 
     AA --> RAG
     PDA --> RAG
+    SUP --> RAG
     CA --> RAG
     QA --> RAG
     DA --> RAG
@@ -131,6 +132,56 @@ knowledge/
 ├── models.py            # Knowledge entry data models
 └── data/                # Persisted knowledge files
 ```
+
+#### Knowledge Versioning Strategy
+
+The knowledge repository uses **metadata-based versioning**. Each knowledge
+entry is stored in ChromaDB with the following metadata fields:
+
+| Field | Description |
+|-------|-------------|
+| `knowledge_id` | Unique identifier for the knowledge entry |
+| `version` | Integer version number, incremented on update |
+| `created_at` | Timestamp of initial creation |
+| `updated_at` | Timestamp of the most recent update |
+| `source` | Originating project and task identifier |
+| `domain` | Domain or category of the knowledge |
+| `knowledge_type` | Type classification (e.g., code pattern, architecture pattern) |
+| `validation_status` | Whether the entry has been validated (pending, validated, rejected) |
+
+ChromaDB stores the vector embedding, document content, and metadata.
+The repository layer (`repository.py`) manages version semantics: when
+a knowledge entry is updated, a new version is created with an
+incremented version number and updated timestamp. Previous versions
+remain queryable by specifying version filters in metadata.
+
+No separate database is introduced; all versioning is handled through
+ChromaDB metadata fields and the repository abstraction layer.
+
+### 3.7 Logging & Observability
+
+Agent-level actions and decisions are recorded through the backend
+observability layer. This is not a separate service or agent — it is an
+integral part of the backend infrastructure (§3.2).
+
+Each log event contains:
+
+| Field | Description |
+|-------|-------------|
+| `agent_id` | Identifier of the agent producing the event |
+| `task_id` | Identifier of the task being executed |
+| `timestamp` | ISO-8601 timestamp of the event |
+| `action_type` | Type of action (e.g., `execute`, `query_rag`, `evaluate`) |
+| `execution_status` | Outcome of the action (e.g., `success`, `failure`, `timeout`) |
+| `metadata` | Additional context (e.g., LLM model used, token count, duration) |
+
+Logs serve three purposes:
+
+1. **Debugging** — trace agent behaviour during development
+2. **Traceability** — satisfy FR-1.5 and NFR-5.1 by recording all agent
+   invocations with timestamps and trace IDs
+3. **Evaluation** — provide data for performance metrics and experiment
+   analysis (FR-7.2)
 
 ## 4. Data Flow
 

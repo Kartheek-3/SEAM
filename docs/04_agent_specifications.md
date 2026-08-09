@@ -49,6 +49,7 @@ class AgentInput(BaseModel):
     context: dict[str, Any]
     instructions: str
     dependencies: list[str] = []
+    rework_feedback: str | None = None
     metadata: dict[str, Any] = {}
 
 class AgentOutput(BaseModel):
@@ -188,7 +189,7 @@ automated testing, code review, and quality assessment.
 - Generates and runs unit tests
 - Performs static analysis and code review
 - Compares output against requirements
-- Provides actionable feedback for the Coding Agent
+- Provides actionable rework feedback to the Supervisor/Orchestrator
 - Reports quality verdicts to the Supervisor
 
 **LLM:** DeepSeek-Coder (understands code well enough to test and review it)
@@ -228,8 +229,16 @@ documentation, create deployment configurations.
 | **Planning** | — | — | Reports to | — | — | — |
 | **Supervisor** | Dispatches | Dispatches | — | Dispatches | Dispatches | Dispatches |
 | **Coding** | — | — | Reports to | — | — | — |
-| **QA** | — | — | Reports to | Feedback | — | — |
+| **QA** | — | — | Reports to | Feedback (via Supervisor) | — | — |
 | **Delivery** | — | — | Reports to | — | — | — |
 
-> **Note:** All inter-agent communication is mediated by the Supervisor.
-> Agents do not communicate directly with each other.
+> **Note:** All inter-agent communication is mediated by the
+> Supervisor/Orchestrator. Agents do not communicate directly with each
+> other. When the QA Agent identifies quality issues, it reports its
+> findings to the Supervisor, which then dispatches rework instructions
+> (including QA feedback) to the Coding Agent via the `rework_feedback`
+> field in `AgentInput`.
+>
+> ```
+> QA Agent → Supervisor/Orchestrator → Coding Agent
+> ```
