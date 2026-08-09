@@ -49,7 +49,7 @@ class AgentInput(BaseModel):
     context: dict[str, Any]
     instructions: str
     dependencies: list[str] = []
-    rework_feedback: str | None = None
+    rework_feedback: ReworkFeedback | None = None
     metadata: dict[str, Any] = {}
 
 class AgentOutput(BaseModel):
@@ -235,8 +235,8 @@ documentation, create deployment configurations.
 > **Note:** All inter-agent communication is mediated by the
 > Supervisor/Orchestrator. Agents do not communicate directly with each
 > other. When the QA Agent identifies quality issues, it reports its
-> findings to the Supervisor, which then dispatches rework instructions
-> (including QA feedback) to the Coding Agent via the `rework_feedback`
+> findings to the Supervisor, which then dispatches structured rework instructions
+> (including QA feedback via the `ReworkFeedback` schema) to the Coding Agent via the `rework_feedback`
 > field in `AgentInput`.
 >
 > ```
