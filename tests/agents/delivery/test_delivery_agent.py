@@ -44,9 +44,7 @@ class MockLLM:
 
 @pytest.fixture
 def agent():
-    agent = DeliveryAgent()
-    agent.llm = MockLLM()
-    return agent
+    return DeliveryAgent(llm_client=MockLLM())
 
 def create_input(qa_verdict=QAVerdict.PASS, artifacts=None) -> AgentInput:
     if artifacts is None:

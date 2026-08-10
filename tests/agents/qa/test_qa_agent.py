@@ -43,9 +43,7 @@ class MockLLM:
 
 @pytest.fixture
 def agent():
-    agent = QAAgent()
-    agent.llm = MockLLM()
-    return agent
+    return QAAgent(llm_client=MockLLM())
 
 def create_input(artifacts=None) -> AgentInput:
     if artifacts is None:

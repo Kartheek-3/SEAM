@@ -39,9 +39,7 @@ class MockLLM:
 
 @pytest.fixture
 def agent():
-    agent = CodingAgent()
-    agent.llm = MockLLM()
-    return agent
+    return CodingAgent(llm_client=MockLLM())
 
 def create_input(instructions: str = "Write a python script", context=None, rework=None) -> AgentInput:
     return AgentInput(

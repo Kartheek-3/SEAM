@@ -115,12 +115,9 @@ def supervisor():
     # Construct all 6 agents (pass mock_llm where required, or inject later)
     analysis = AnalysisAgent(llm_client=mock_llm)
     planning = PlanningAgent(llm_client=mock_llm)
-    coding = CodingAgent()
-    coding.llm = mock_llm
-    qa = QAAgent()
-    qa.llm = mock_llm
-    delivery = DeliveryAgent()
-    delivery.llm = mock_llm
+    coding = CodingAgent(llm_client=mock_llm)
+    qa = QAAgent(llm_client=mock_llm)
+    delivery = DeliveryAgent(llm_client=mock_llm)
     
     # Initialize the registry
     registry = {

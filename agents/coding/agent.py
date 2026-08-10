@@ -25,12 +25,15 @@ class GeneratedFile(BaseModel):
 class CodeGenerationResponse(BaseModel):
     files: list[GeneratedFile] = Field(..., description="List of generated files")
 
+from backend.llm.client import LLMClient
+
 class CodingAgent(BaseAgent):
     """
     Coding Agent responsible for generating source code artifacts based on task specifications.
     """
-    def __init__(self, rag_service: RAGService | None = None):
+    def __init__(self, llm_client: LLMClient, rag_service: RAGService | None = None):
         super().__init__(agent_id="coding_agent", rag_service=rag_service)
+        self.llm = llm_client
 
     def _validate_path(self, path: str) -> None:
         """Ensure the path is strictly relative and contains no traversal operators."""

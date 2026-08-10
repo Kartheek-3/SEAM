@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  seam-core:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: seam-core
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - CHROMA_HOST=seam-chroma
+      - CHROMA_PORT=8001
+      - CHROMA_PERSIST_DIR=/app/knowledge/data
+    volumes:
+      - seam-knowledge:/app/knowledge/data
+      - .env:/app/.env
+    depends_on:
+      - seam-chroma
+    restart: unless-stopped
+
+  seam-chroma:
+    image: chromadb/chroma:latest
+    container_name: seam-chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - seam-chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    restart: unless-stopped
+
+volumes:
+  seam-knowledge:
+  seam-chroma-data:

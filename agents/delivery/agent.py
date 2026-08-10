@@ -30,13 +30,16 @@ class DeliveryGenerationResponse(BaseModel):
     files: list[GeneratedFile] = Field(default_factory=list, description="List of generated deployment and documentation files.")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Packaging metadata.")
 
+from backend.llm.client import LLMClient
+
 class DeliveryAgent(BaseAgent):
     """
     Delivery Agent responsible for final packaging, generating Docker configurations,
     and preparing release documentation.
     """
-    def __init__(self, rag_service: RAGService | None = None):
+    def __init__(self, llm_client: LLMClient, rag_service: RAGService | None = None):
         super().__init__(agent_id="delivery_agent", rag_service=rag_service)
+        self.llm = llm_client
 
     def _validate_qa_gate(self, input_data: AgentInput) -> None:
         """Deterministically enforces the QA gate."""

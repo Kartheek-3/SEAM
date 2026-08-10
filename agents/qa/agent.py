@@ -22,13 +22,16 @@ class QAEvaluationResponse(BaseModel):
     tests_total: int = Field(default=0, description="Total number of acceptance criteria evaluated.")
     recommendations: list[str] = Field(default_factory=list, description="General architectural or structural recommendations.")
 
+from backend.llm.client import LLMClient
+
 class QAAgent(BaseAgent):
     """
     QA Agent responsible for static code analysis, semantic review against requirements,
     and structured QA result generation.
     """
-    def __init__(self, rag_service: RAGService | None = None):
+    def __init__(self, llm_client: LLMClient, rag_service: RAGService | None = None):
         super().__init__(agent_id="qa_agent", rag_service=rag_service)
+        self.llm = llm_client
 
     def _format_prompt(self, input_data: AgentInput) -> str:
         knowledge_text = ""

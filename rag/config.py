@@ -2,18 +2,18 @@
 RAG Configuration
 """
 
-import os
+from backend.config import settings
 
 # ChromaDB Config
-CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./knowledge/data")
+CHROMA_PERSIST_DIR = settings.chroma_persist_dir
 
 # Chunking Defaults
-DEFAULT_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "512"))
-DEFAULT_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "50"))
+DEFAULT_CHUNK_SIZE = settings.rag_chunk_size
+DEFAULT_CHUNK_OVERLAP = settings.rag_chunk_overlap
 
 # Retrieval Defaults
-DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
-DEFAULT_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.7"))
+DEFAULT_TOP_K = settings.rag_top_k
+DEFAULT_SIMILARITY_THRESHOLD = settings.rag_similarity_threshold
 
 # Collection Names
 COLLECTION_PROJECT_DOCS = "project_docs"

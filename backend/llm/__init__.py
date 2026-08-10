@@ -1,7 +1,4 @@
-"""
-SEAM LLM Client Package
-"""
+from backend.llm.client import LLMClient, LLMException
+from backend.llm.ollama_client import OllamaClient
 
-from .client import LLMClient, LLMException
-
-__all__ = ["LLMClient", "LLMException"]
+__all__ = ["LLMClient", "LLMException", "OllamaClient"]
