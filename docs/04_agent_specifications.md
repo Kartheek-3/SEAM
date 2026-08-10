@@ -82,7 +82,7 @@ natural-language project descriptions.
 - Domain entities and relationships
 
 **Key Behaviours:**
-- Queries the RAG service for similar past requirements
+- Queries the shared RAG infrastructure to obtain relevant domain knowledge before LLM-based analysis
 - Identifies missing information and flags ambiguities
 - Produces structured output suitable for the Planning & Design Agent
 

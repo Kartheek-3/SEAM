@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from agents.base import BaseAgent, RAGService
 from agents.analysis.exceptions import EmptyInputError
-from agents.analysis.prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, REWORK_SECTION_TEMPLATE
+from agents.analysis.prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, REWORK_SECTION_TEMPLATE, KNOWLEDGE_SECTION_TEMPLATE
 from backend.llm.client import LLMClient, LLMException
 from backend.schemas import (
     AgentInput,
@@ -60,10 +60,25 @@ class AnalysisAgent(BaseAgent):
             # Log length securely
             logger.info(f"Task {task_id}: Processing raw_description of length {len(raw_description)}")
 
-            # 2. Build Prompts
+            # 2. RAG Retrieval
+            knowledge_section = ""
+            if self.rag_service:
+                logger.info(f"Task {task_id}: Attempting RAG retrieval for raw_description")
+                try:
+                    rag_context = await self.rag_service.retrieve(query=str(raw_description))
+                    if rag_context and rag_context.chunks:
+                        logger.info(f"Task {task_id}: Retrieved {len(rag_context.chunks)} chunks in {rag_context.retrieval_time_ms}ms")
+                        chunks_text = "\n\n".join([f"Source: {c.source}\n{c.content}" for c in rag_context.chunks])
+                        knowledge_section = KNOWLEDGE_SECTION_TEMPLATE.format(knowledge_text=chunks_text)
+                    else:
+                        logger.info(f"Task {task_id}: No relevant knowledge found.")
+                except Exception as e:
+                    logger.error(f"Task {task_id}: RAG retrieval failed: {e}")
+
+            # 3. Build Prompts
             rework_section = ""
             if input.rework_feedback:
-                findings_str = "\\n".join(
+                findings_str = "\n".join(
                     f"- [{f.severity.value.upper()}] {f.description}" 
                     for f in input.rework_feedback.qa_result.findings
                 )
@@ -75,11 +90,12 @@ class AnalysisAgent(BaseAgent):
 
             user_prompt = USER_PROMPT_TEMPLATE.format(
                 raw_description=raw_description,
+                knowledge_section=knowledge_section,
                 instructions=input.instructions,
                 rework_section=rework_section
             )
 
-            # 3. LLM Invocation & Retry Loop
+            # 4. LLM Invocation & Retry Loop
             requirement_spec = await self._generate_with_retries(user_prompt, input.context.get("project_id", "unknown"))
 
             # Calculate confidence based on ambiguities

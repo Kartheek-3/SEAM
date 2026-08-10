@@ -112,7 +112,22 @@ All agents:
 
 ### 3.5 RAG Infrastructure
 
+The shared RAG infrastructure provides relevant domain knowledge to agents prior to LLM analysis. For example, the Analysis Agent integrates with RAG as follows:
+
+```text
+Analysis Agent
+      │
+      ▼
+Shared RAG Infrastructure
+      │
+      ▼
+KnowledgeContext
+      │
+      ▼
+Analysis Agent / LLM
 ```
+
+```text
 rag/
 ├── __init__.py
 ├── chunker.py           # Document chunking strategies
