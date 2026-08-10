@@ -18,11 +18,12 @@ from backend.schemas.enums import (
     QAVerdict,
     TaskStatus,
     TaskType,
+    KnowledgeType,
 )
 
 # Core schemas
 from backend.schemas.artifacts import Artifact
-from backend.schemas.knowledge import KnowledgeChunk, KnowledgeContext
+from backend.schemas.knowledge import KnowledgeChunk, KnowledgeContext, KnowledgeEntry
 from backend.schemas.task import Task
 
 # QA schemas

@@ -132,7 +132,7 @@ class KnowledgeEntry(BaseModel):
     title: str
     content: str
     tags: list[str] = []
-    quality_score: float = Field(ge=0.0, le=1.0)
+    quality_score: float = Field(ge=0.0, le=1.0, default=1.0)
     validated: bool = False
     created_at: datetime
     accessed_count: int = 0
@@ -203,7 +203,7 @@ class KnowledgeChunk(BaseModel):
     content: str
     similarity_score: float = Field(ge=0.0, le=1.0)
     source: str
-    metadata: dict[str, Any] = {}
+    metadata: dict[str, object] = {}
 
 class KnowledgeContext(BaseModel):
     query: str

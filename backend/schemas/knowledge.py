@@ -8,7 +8,22 @@ Source: docs/09_data_models.md §4 (RAGResult, RAGChunk)
 Traceability: FR-3.3, FR-3.4
 """
 
+from datetime import datetime
 from pydantic import BaseModel, Field
+from backend.schemas.enums import KnowledgeType
+
+class KnowledgeEntry(BaseModel):
+    id: str
+    source_project_id: str
+    source_task_id: str
+    type: KnowledgeType
+    title: str
+    content: str
+    tags: list[str] = []
+    quality_score: float = Field(ge=0.0, le=1.0, default=1.0)
+    validated: bool = False
+    created_at: datetime
+    accessed_count: int = 0
 
 
 class KnowledgeChunk(BaseModel):

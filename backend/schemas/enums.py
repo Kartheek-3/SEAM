@@ -80,3 +80,13 @@ class FindingSeverity(str, Enum):
     MAJOR = "major"
     MINOR = "minor"
     INFO = "info"
+
+
+class KnowledgeType(str, Enum):
+    """Classification of knowledge entries."""
+
+    REQUIREMENT_PATTERN = "requirement_pattern"
+    ARCHITECTURE_PATTERN = "architecture_pattern"
+    CODE_PATTERN = "code_pattern"
+    TEST_PATTERN = "test_pattern"
+    LESSON_LEARNED = "lesson_learned"
