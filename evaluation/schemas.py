@@ -86,10 +86,15 @@ class ExperimentResult(BaseModel):
     execution_time_sec: float = Field(default=0.0, ge=0.0)
     llm_calls: int = Field(default=0, ge=0)
     rework_cycles: int = Field(default=0, ge=0)
-    qa_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    qa_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     defect_counts: DefectCounts = Field(default_factory=DefectCounts)
     delivery_status: str = ""
     rag_used: bool = False
+    rag_retrievals: int = Field(default=0, ge=0)
+    rag_successes: int = Field(default=0, ge=0)
+    rag_failures: int = Field(default=0, ge=0)
+    chunks_retrieved: int = Field(default=0, ge=0)
+    rag_latency_ms: int = Field(default=0, ge=0)
     knowledge_reused: bool = False
     result_mode: ResultMode = ResultMode.MOCK
     reproducibility: ReproducibilityInfo = Field(default_factory=ReproducibilityInfo)
