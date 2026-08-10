@@ -81,3 +81,5 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+evaluation/results/
