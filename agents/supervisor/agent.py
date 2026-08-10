@@ -187,15 +187,23 @@ class SupervisorAgent(BaseAgent):
         if not agent:
             raise AgentNotFoundError(f"No agent registered for TaskType: {task.type.value}")
             
-        dep_outputs = {}
+        dep_outputs = []
+        qa_result = None
         for dep in task.dependencies:
             if dep in state["agent_outputs"]:
-                dep_outputs[dep] = state["agent_outputs"][dep].result
+                out = state["agent_outputs"][dep]
+                dep_outputs.extend([a.model_dump() for a in out.artifacts])
+                if state["tasks"][dep].type == TaskType.QA:
+                    qa_result = out.result
+                elif state["tasks"][dep].type == TaskType.ANALYSIS:
+                    qa_result = out.result # Just in case it's requirement spec, wait no, requirement spec is passed differently.
                 
         context = {
             "task_data": task.input_data,
             "dependency_outputs": dep_outputs
         }
+        if qa_result:
+            context["qa_result"] = qa_result
         
         agent_input = AgentInput(
             task_id=task_id,
@@ -225,7 +233,9 @@ class SupervisorAgent(BaseAgent):
             if task.type == TaskType.QA:
                 qa_result = output.result
                 if qa_result.get("verdict") == "fail":
-                    source_id = qa_result.get("task_id")
+                    source_ids = [dep for dep in task.dependencies if state["tasks"][dep].type == TaskType.CODING]
+                    source_id = source_ids[0] if source_ids else (task.dependencies[0] if task.dependencies else None)
+                    
                     if source_id and source_id in state["completed_tasks"]:
                         rework_count = state["rework_counts"].get(source_id, 0)
                         if rework_count < 3:

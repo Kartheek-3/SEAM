@@ -73,12 +73,10 @@ def create_input(artifacts=None) -> AgentInput:
 async def test_missing_artifacts(agent):
     out = await agent.execute(create_input(artifacts=[]))
     assert out.status == AgentStatus.SUCCESS
-    assert "qa_result" in out.result
     
-    qa_result = out.result["qa_result"]
-    assert qa_result["verdict"] == QAVerdict.FAIL
-    assert len(qa_result["findings"]) == 1
-    assert qa_result["findings"][0]["severity"] == FindingSeverity.CRITICAL
+    assert out.result["verdict"] == "fail"
+    assert len(out.result["findings"]) == 1
+    assert out.result["findings"][0]["severity"] == FindingSeverity.CRITICAL
 
 @pytest.mark.asyncio
 async def test_basic_qa_pass(agent):
@@ -86,9 +84,8 @@ async def test_basic_qa_pass(agent):
     assert out.status == AgentStatus.SUCCESS
     assert out.agent_id == AgentRole.QA
     
-    qa_result = out.result["qa_result"]
-    assert qa_result["verdict"] == QAVerdict.PASS
-    assert qa_result["score"] == 1.0
+    assert out.result["verdict"] == "pass"
+    assert out.result["score"] == 1.0
 
 @pytest.mark.asyncio
 async def test_basic_qa_fail(agent):
@@ -112,10 +109,9 @@ async def test_basic_qa_fail(agent):
     out = await agent.execute(create_input())
     assert out.status == AgentStatus.SUCCESS
     
-    qa_result = out.result["qa_result"]
-    assert qa_result["verdict"] == QAVerdict.FAIL
-    assert qa_result["score"] == 0.8  # 1.0 - 0.2 (MAJOR)
-    assert len(qa_result["findings"]) == 1
+    assert out.result["verdict"] == "fail"
+    assert out.result["score"] == 0.8  # 1.0 - 0.2 (MAJOR)
+    assert len(out.result["findings"]) == 1
 
 @pytest.mark.asyncio
 async def test_malformed_json_retry_and_failure(agent):

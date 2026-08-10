@@ -102,7 +102,7 @@ class QAAgent(BaseAgent):
                 task_id=input_data.task_id,
                 agent_id=AgentRole.QA,
                 status=AgentStatus.SUCCESS, # QA successfully performed its job of failing the code
-                result={"qa_result": missing_result.model_dump()},
+                result=missing_result.model_dump(),
                 execution_time_ms=int((time.time() - start_time) * 1000)
             )
 
@@ -141,7 +141,7 @@ class QAAgent(BaseAgent):
                     task_id=input_data.task_id,
                     agent_id=AgentRole.QA,
                     status=AgentStatus.SUCCESS,
-                    result={"qa_result": qa_result.model_dump()},
+                    result=qa_result.model_dump(),
                     artifacts=[], # In Phase 5, QA does not generate code or persist tests natively
                     execution_time_ms=execution_time
                 )
