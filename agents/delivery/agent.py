@@ -43,16 +43,23 @@ class DeliveryAgent(BaseAgent):
 
     def _validate_qa_gate(self, input_data: AgentInput) -> None:
         """Deterministically enforces the QA gate."""
+        required_qa_task_ids = set([dep for dep in input_data.dependencies if "qa" in dep.lower()])
+        
         qa_result = input_data.context.get("qa_result")
-        if not qa_result:
-            raise DeliveryQAGateError("Missing QA result. Delivery cannot proceed.")
-        
-        # Handle case where qa_result is a dict (serialized) or a QAResult object
-        verdict = qa_result.get("verdict") if isinstance(qa_result, dict) else qa_result.verdict
-        
-        # Enum string comparison or enum value comparison
-        if verdict != QAVerdict.PASS and verdict != "pass":
-            raise DeliveryQAGateError(f"QA verdict is {verdict}. Delivery is blocked.")
+        qa_results = input_data.context.get("qa_results", [])
+        if qa_result and not qa_results:
+            qa_results = [qa_result]
+            
+        actual_qa_task_ids = set()
+        for res in qa_results:
+            task_id = res.get("task_id") if isinstance(res, dict) else res.task_id
+            verdict = res.get("verdict") if isinstance(res, dict) else res.verdict
+            if verdict != QAVerdict.PASS and verdict != "pass":
+                raise DeliveryQAGateError(f"QA verdict is {verdict} for task {task_id}. Delivery is blocked.")
+            actual_qa_task_ids.add(task_id)
+            
+        if required_qa_task_ids != actual_qa_task_ids:
+            raise DeliveryQAGateError(f"Mismatched QA tasks. Required: {required_qa_task_ids}, Actual: {actual_qa_task_ids}")
 
     def _validate_path(self, path: str) -> str:
         """Deterministically ensure paths are safe."""

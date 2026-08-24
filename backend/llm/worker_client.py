@@ -39,7 +39,7 @@ class WorkerAwareOllamaClient(LLMClient):
         
         # 1. Select a worker (blocks until one is available)
         try:
-            worker = await self.worker_pool.select_worker(task_id=task_id, timeout=300.0)
+            worker = await self.worker_pool.select_worker(task_id=task_id, timeout=settings.worker_lease_timeout)
         except TimeoutError as e:
             raise LLMException("Failed to acquire an available worker within timeout.") from e
             

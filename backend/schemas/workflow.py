@@ -40,3 +40,4 @@ class WorkflowState(TypedDict):
     current_task_id: str | None
     messages: list[dict[str, Any]]
     final_artifacts: list[Artifact]
+    qa_execution_history: list[dict[str, Any]]

@@ -117,7 +117,8 @@ class SupervisorAgent(BaseAgent):
             "quality_scores": {},
             "current_task_id": None,
             "messages": [],
-            "final_artifacts": []
+            "final_artifacts": [],
+            "qa_execution_history": []
         }
 
     async def execute(self, input: AgentInput) -> AgentOutput:
@@ -245,12 +246,21 @@ class SupervisorAgent(BaseAgent):
             
         dep_outputs = []
         qa_result = None
+        qa_results = []
+        
         for dep in task.dependencies:
             if dep in state["agent_outputs"]:
                 out = state["agent_outputs"][dep]
                 dep_outputs.extend([a.model_dump(mode='json') for a in out.artifacts])
+                
                 if state["tasks"][dep].type == TaskType.QA:
                     qa_result = out.result
+                    # Ensure we pass the task ID with the result so Delivery can map it
+                    if isinstance(out.result, dict):
+                        out.result["task_id"] = dep
+                    else:
+                        out.result.task_id = dep
+                    qa_results.append(out.result)
                     
                     # Phase 9D.16: Traverse backwards to grab the corresponding Coding artifacts for Delivery
                     for qa_dep in state["tasks"][dep].dependencies:
@@ -267,6 +277,8 @@ class SupervisorAgent(BaseAgent):
         }
         if qa_result:
             context["qa_result"] = qa_result
+        if qa_results:
+            context["qa_results"] = qa_results
         
         agent_input = AgentInput(
             task_id=task_id,
@@ -287,6 +299,19 @@ class SupervisorAgent(BaseAgent):
         task = state["tasks"][task_id]
         
         state["running_tasks"].remove(task_id)
+        
+        # Append QA executions to history for telemetry and audit
+        if task.type == TaskType.QA:
+            history_record = {
+                "task_id": task_id,
+                "attempt": state["rework_counts"].get(task_id, 0) + 1,
+                "rework_cycle": state["rework_counts"].get(task_id, 0),
+                "verdict": output.result.get("verdict", "fail") if isinstance(output.result, dict) else getattr(output.result, "verdict", "fail"),
+                "timestamp": int(time.time()),
+                "execution_time_ms": output.execution_time_ms,
+                "failure_state": output.feedback if output.status != AgentStatus.SUCCESS else None
+            }
+            state["qa_execution_history"].append(history_record)
         
         if output.status == AgentStatus.SUCCESS:
             state["completed_tasks"].append(task_id)

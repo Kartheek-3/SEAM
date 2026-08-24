@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from backend.llm.worker import Worker, check_health, async_check_health, WorkerStatus
 from backend.llm.worker_registry import WorkerRegistry
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +26,19 @@ class WorkerPool:
             if not worker or worker.status != WorkerStatus.UNHEALTHY:
                 return
                 
-            is_healthy = await async_check_health(worker, timeout_sec=2.0)
+            is_healthy = await async_check_health(worker, timeout_sec=settings.worker_health_timeout)
             self.registry.update_health_timestamp(worker_id, is_healthy)
             if is_healthy:
                 logger.info(f"Worker {worker_id} recovered and is now AVAILABLE.")
         finally:
             self._recovering_workers.discard(worker_id)
 
-    async def select_worker(self, task_id: str, required_capability: Optional[str] = None, timeout: float = 60.0) -> Worker:
+    async def select_worker(self, task_id: str, required_capability: Optional[str] = None, timeout: Optional[float] = None) -> Worker:
         """
         Block until an AVAILABLE worker is found, then mark it BUSY and return it.
         If timeout is reached, raises TimeoutError.
         """
+        timeout = timeout or settings.worker_lease_timeout
         start_time = asyncio.get_event_loop().time()
         
         while True:

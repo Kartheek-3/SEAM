@@ -445,13 +445,26 @@ class ExperimentRunner:
             context={"project_plan": planning_out.result},
             instructions="Execute plan"
         )
-        sup_out = await supervisor.execute(sup_in)
+        try:
+            sup_out = await supervisor.execute(sup_in)
+            success = (sup_out.status == AgentStatus.SUCCESS)
+            delivery_status = "SUCCESS" if success else "FAILURE"
+            workflow_state = sup_out.result if isinstance(sup_out.result, dict) else {}
+        except Exception as e:
+            logger.error(f"Supervisor execution failed with exception: {e}")
+            success = False
+            delivery_status = f"Exception: {e}"
+            # Extract partial state if available from the graph
+            workflow_state = {}
+            if hasattr(supervisor, "graph"):
+                try:
+                    # LangGraph may not expose partial state perfectly on a crash, but we can try to find rework counts
+                    # However, since SupervisorAgent catches its own exceptions and returns an AgentOutput,
+                    # a crash here means a deeper system failure.
+                    pass
+                except Exception:
+                    pass
 
-        # Collect metrics from actual execution
-        success = (sup_out.status == AgentStatus.SUCCESS)
-        delivery_status = "SUCCESS" if success else "FAILURE"
-        
-        workflow_state = sup_out.result if isinstance(sup_out.result, dict) else {}
         rework_cycles = sum(workflow_state.get("rework_counts", {}).values())
         llm_calls = llm_client.invocation_count
 
@@ -506,7 +519,7 @@ class ExperimentRunner:
             task_completion_rate=1.0 if success else 0.5,
         )
 
-    def _build_failed_real_result(self, exp_id, scenario, variant, repro, reason, llm_client=None, rag_service=None):
+    def _build_failed_real_result(self, exp_id, scenario, variant, repro, reason, llm_client=None, rag_service=None, rework_cycles=0):
         return ExperimentResult(
             experiment_id=exp_id,
             scenario_id=scenario.scenario_id,
@@ -515,7 +528,7 @@ class ExperimentRunner:
             domain=scenario.domain,
             success=False,
             llm_calls=llm_client.invocation_count if llm_client else 0,
-            rework_cycles=0,
+            rework_cycles=rework_cycles,
             qa_score=None,
             defect_counts=DefectCounts(critical=0, major=0, minor=0),
             delivery_status=reason,
@@ -534,15 +547,18 @@ class ExperimentRunner:
 
     def _persist_result(self, result: ExperimentResult) -> str:
         """
-        Save an experiment result to disk as JSON.
-
-        Returns the file path where the result was saved.
+        Save an experiment result to disk as JSON atomically.
         """
         filename = f"{result.experiment_id}.json"
         filepath = os.path.join(self.results_dir, filename)
+        tmppath = filepath + ".tmp"
 
-        with open(filepath, "w", encoding="utf-8") as f:
+        with open(tmppath, "w", encoding="utf-8") as f:
             f.write(result.model_dump_json(indent=2))
+            f.flush()
+            os.fsync(f.fileno())
+            
+        os.replace(tmppath, filepath)
 
         logger.info(f"Result persisted: {filepath}")
         return filepath

@@ -8,7 +8,7 @@ Provides a central, type-safe configuration object for the framework.
 import json
 from typing import Optional, List, Dict, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 
 
 class AppConfig(BaseSettings):
@@ -34,7 +34,9 @@ class AppConfig(BaseSettings):
     ollama_model_coding: str = "deepseek-coder"
     ollama_model_general: str = "llama3.1"
     ollama_model_embedding: str = "nomic-embed-text"
-    ollama_timeout: int = 120
+    ollama_timeout: int = 300
+    worker_lease_timeout: int = 360
+    worker_health_timeout: float = 2.0
     ollama_workers: str = "" # JSON string
 
     @field_validator("ollama_workers")
@@ -69,6 +71,15 @@ class AppConfig(BaseSettings):
             return v
         except json.JSONDecodeError:
             raise ValueError("OLLAMA_WORKERS must be a valid JSON string")
+            
+    @model_validator(mode="after")
+    def validate_timeout_hierarchy(self) -> 'AppConfig':
+        if not (self.worker_health_timeout < self.ollama_timeout < self.worker_lease_timeout):
+            raise ValueError(
+                f"Invalid timeout hierarchy: health({self.worker_health_timeout}) < "
+                f"http({self.ollama_timeout}) < lease({self.worker_lease_timeout}) must be strictly increasing."
+            )
+        return self
 
     # ChromaDB / RAG
     chroma_host: str = "localhost"
