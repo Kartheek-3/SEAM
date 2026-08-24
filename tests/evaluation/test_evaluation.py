@@ -532,13 +532,13 @@ class TestRealRunner:
         return ExperimentRunner(results_dir=str(tmp_path / "results"))
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
     @patch("evaluation.runner.Retriever")
     @patch("evaluation.runner.OllamaEmbedder")
-    async def test_real_run_successful(self, mock_emb, mock_rag, mock_ollama, runner):
+    async def test_real_run_successful(self, mock_emb, mock_rag, mock_worker_client, runner):
         # Setup mocks
         mock_client = MagicMock()
-        mock_ollama.return_value = mock_client
+        mock_worker_client.return_value = mock_client
         
         from unittest.mock import AsyncMock
         with patch("evaluation.runner.AnalysisAgent") as mock_analysis, \
@@ -579,9 +579,9 @@ class TestRealRunner:
             assert result.rag_used is True
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_real_run_rag_disabled(self, mock_ollama, runner):
-        mock_ollama.return_value = MagicMock()
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    async def test_real_run_rag_disabled(self, mock_worker_client, runner):
+        mock_worker_client.return_value = MagicMock()
         from unittest.mock import AsyncMock
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
@@ -604,8 +604,8 @@ class TestRealRunner:
             assert result.rag_used is False
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient", side_effect=Exception("Ollama down"))
-    async def test_unavailable_llm(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient", side_effect=Exception("Ollama down"))
+    async def test_unavailable_llm(self, mock_worker_client, runner):
         try:
             result = await runner.run(
                 scenario_id="finance-ledger",

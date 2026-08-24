@@ -13,6 +13,7 @@ from backend.schemas.artifacts import Artifact
 from backend.schemas.qa import ReworkFeedback
 from agents.coding.prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, REWORK_PROMPT_TEMPLATE
 from agents.coding.exceptions import PathTraversalError, CodeGenerationError
+from agents.coding.parser import MarkdownParser
 from backend.llm.client import LLMException
 
 logger = logging.getLogger(__name__)
@@ -140,37 +141,92 @@ class CodingAgent(BaseAgent):
 
         user_prompt = self._format_prompt(input_data)
         
-        # Max retries for malformed JSON or empty code
         max_retries = 3
         last_error = ""
 
         for attempt in range(max_retries):
             try:
-                response = await self.llm.generate_structured_output(
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                    response_model=CodeGenerationResponse
-                )
+                raw_markdown = ""
+                # Unwrap TelemetryLLMClient if present
+                actual_llm = self.llm
+                if hasattr(actual_llm, "base_client"):
+                    actual_llm = actual_llm.base_client
+                    
+                # Attempt to use WorkerPool directly to bypass JsonOutputParser
+                if hasattr(actual_llm, "worker_pool"):
+                    import urllib.request
+                    import urllib.parse
+                    import json
+                    import asyncio
+                    
+                    pool = actual_llm.worker_pool
+                    # Fallback to general model if not in worker client (should not happen in prod SEAM)
+                    model_name = getattr(actual_llm, "model_name", "llama3.1")
+                    worker = await pool.select_worker(task_id=input_data.task_id, timeout=300.0)
+                    is_infrastructure_failure = False
+                    
+                    try:
+                        url = f"{worker.base_url}/api/generate"
+                        full_prompt = f"{SYSTEM_PROMPT}\n\n{user_prompt}"
+                        
+                        data = {
+                            "model": worker.model,
+                            "prompt": full_prompt,
+                            "stream": False,
+                            "options": {"temperature": 0.1}
+                        }
+                        
+                        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'}, method='POST')
+                        
+                        try:
+                            response = await asyncio.to_thread(urllib.request.urlopen, req, timeout=300)
+                            res_data = json.loads(response.read().decode('utf-8'))
+                            raw_markdown = res_data.get('response', '')
+                        except TimeoutError as e:
+                            is_infrastructure_failure = True
+                            raise LLMException("LLM generation timed out") from e
+                        except Exception as e:
+                            is_infrastructure_failure = True
+                            raise LLMException(f"LLM generation failed: {e}") from e
+                            
+                    finally:
+                        if is_infrastructure_failure:
+                            pool.report_infrastructure_failure(worker.worker_id)
+                        else:
+                            pool.release_worker(worker.worker_id)
+                else:
+                    # Fallback for MockLLM in tests
+                    # MockLLM generate_structured_output can just return the CodeGenerationResponse directly
+                    response = await self.llm.generate_structured_output(
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=user_prompt,
+                        response_model=CodeGenerationResponse
+                    )
+                    # We convert MockLLM response to fake markdown to feed to parser
+                    lines = []
+                    for f in response.files:
+                        lines.append(f"<!-- path: {f.path} -->")
+                        lines.append(f"```{f.language}")
+                        lines.append(f.content)
+                        lines.append("```")
+                    raw_markdown = "\n".join(lines)
 
-                if not response.files:
-                    raise CodeGenerationError("LLM returned zero files.")
+                # Parse the raw markdown deterministically
+                parsed_files = MarkdownParser.parse(raw_markdown)
 
                 artifacts = []
-                for idx, gen_file in enumerate(response.files):
-                    self._validate_path(gen_file.path)
+                for idx, gen_file in enumerate(parsed_files):
+                    self._validate_path(gen_file["path"])
                     
-                    if not gen_file.content.strip():
-                        raise CodeGenerationError(f"Generated file '{gen_file.path}' is empty.")
-                        
                     artifacts.append(
                         Artifact(
                             id=f"art-{input_data.task_id}-{idx}",
-                            project_id=input_data.context.get("project_id", "unknown"), # Can be injected via supervisor context if needed
+                            project_id=input_data.context.get("project_id", "unknown"),
                             task_id=input_data.task_id,
-                            type=gen_file.artifact_type,
-                            name=gen_file.path,
-                            content=gen_file.content,
-                            language=gen_file.language,
+                            type=gen_file["artifact_type"],
+                            name=gen_file["path"],
+                            content=gen_file["content"],
+                            language=gen_file["language"],
                             created_at=datetime.now(timezone.utc)
                         )
                     )
@@ -190,26 +246,10 @@ class CodingAgent(BaseAgent):
             except (PathTraversalError, CodeGenerationError) as e:
                 logger.warning(f"Validation error on attempt {attempt + 1}: {e}")
                 last_error = str(e)
-                user_prompt += f"\n\nValidation Error: {last_error}. Please fix this and generate again."
+                user_prompt += f"\n\nValidation Error: {last_error}. Please fix this and generate again. Return the required Markdown file format. Do not return JSON. Every source file must have: <!-- path: relative/path --> followed by a fenced code block."
             except LLMException as e:
-                logger.warning(f"LLM parsing/generation error on attempt {attempt + 1}: {e}")
-                if "timed out" in str(e).lower():
-                    # If it's a timeout, just let the next iteration try normally without appending the huge json block
-                    pass
-                else:
-                    user_prompt += """
-
-Your previous response could not be parsed as the required JSON object.
-Regenerate the response.
-
-STRICT REQUIREMENTS:
-1. Return ONLY one JSON object.
-2. Do NOT use Markdown fences.
-3. Do NOT write ```python.
-4. Do NOT provide explanations.
-5. Every file must be represented inside the JSON files array.
-6. Code must be encoded as a JSON string.
-7. Escape newlines and quotation marks correctly."""
+                logger.warning(f"LLM generation error on attempt {attempt + 1}: {e}")
+                last_error = str(e)
             except Exception as e:
                 logger.error(f"LLM execution failed: {e}")
                 return AgentOutput(

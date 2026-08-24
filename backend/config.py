@@ -5,8 +5,10 @@ Loads and validates environment variables using pydantic-settings.
 Provides a central, type-safe configuration object for the framework.
 """
 
-from typing import Optional
+import json
+from typing import Optional, List, Dict, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class AppConfig(BaseSettings):
@@ -33,6 +35,40 @@ class AppConfig(BaseSettings):
     ollama_model_general: str = "llama3.1"
     ollama_model_embedding: str = "nomic-embed-text"
     ollama_timeout: int = 120
+    ollama_workers: str = "" # JSON string
+
+    @field_validator("ollama_workers")
+    @classmethod
+    def validate_ollama_workers(cls, v: str) -> str:
+        if not v:
+            return v
+        try:
+            workers = json.loads(v)
+            if not isinstance(workers, list):
+                raise ValueError("OLLAMA_WORKERS must be a JSON array")
+            
+            seen_ids = set()
+            seen_endpoints = set()
+            for w in workers:
+                if "worker_id" not in w:
+                    raise ValueError("Worker missing 'worker_id'")
+                if "host" not in w or "port" not in w:
+                    raise ValueError("Worker missing 'host' or 'port'")
+                if "model" not in w:
+                    raise ValueError("Worker missing 'model'")
+                
+                if w["worker_id"] in seen_ids:
+                    raise ValueError(f"Duplicate worker_id: {w['worker_id']}")
+                seen_ids.add(w["worker_id"])
+                
+                endpoint = f"{w['host']}:{w['port']}"
+                if endpoint in seen_endpoints:
+                    raise ValueError(f"Duplicate endpoint: {endpoint}")
+                seen_endpoints.add(endpoint)
+                
+            return v
+        except json.JSONDecodeError:
+            raise ValueError("OLLAMA_WORKERS must be a valid JSON string")
 
     # ChromaDB / RAG
     chroma_host: str = "localhost"

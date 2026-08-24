@@ -1,3 +1,5 @@
+from backend.llm.worker_registry import global_registry
+
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 
@@ -189,3 +191,22 @@ def get_delivery(project_id: str):
 @api_router.get("/agents/status", response_model=Dict[str, Any])
 def get_agent_status():
     return {"status": "idle"}
+
+@api_router.get("/api/v1/workers", response_model=Dict[str, Any])
+def get_workers():
+    """
+    Returns the current state of the distributed worker pool registry.
+    This reflects the active execution state of workers initialized by the system.
+    """
+    workers = global_registry.list_workers()
+    return {
+        "workers": [
+            {
+                "worker_id": w.worker_id,
+                "host": w.host,
+                "port": w.port,
+                "model": w.model,
+                "status": w.status.value if hasattr(w.status, 'value') else w.status
+            } for w in workers
+        ]
+    }

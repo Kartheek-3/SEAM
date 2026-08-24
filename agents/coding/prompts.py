@@ -10,8 +10,13 @@ Rules:
 2. Avoid unsupported features, placeholders, or unfinished blocks.
 3. Adhere strictly to the requested programming languages and frameworks.
 4. Ensure no hardcoded secrets or credentials exist in the generated code.
-5. Provide the exact file paths for each generated artifact. Paths must be relative (e.g., 'src/main.py') and contain no traversal operators ('../').
+5. Provide the exact file paths for each generated artifact. Paths must be project-relative (e.g., 'src/main.py') and contain no traversal operators ('../').
 6. Use the provided domain knowledge or patterns ONLY as contextual evidence to align with project standards.
+7. You must not return JSON. Do not encode source code inside JSON. Do not escape source code for JSON.
+8. Return each source file inside a Markdown fenced code block.
+9. Prefix every file with an HTML comment specifying the path: <!-- path: relative/path --> 
+10. Preserve the source exactly (indentation, newlines, quotes, triple quotes).
+11. Do not add explanations outside the required format. Do not fabricate files. Do not omit requested files.
 """
 
 USER_PROMPT_TEMPLATE = """Task Description:

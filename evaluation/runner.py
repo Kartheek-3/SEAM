@@ -34,6 +34,10 @@ from evaluation.scenarios import ScenarioDefinition, get_scenario, list_scenario
 
 from backend.schemas import TaskType, AgentInput, AgentStatus
 from backend.llm.ollama_client import OllamaClient
+from backend.llm.worker import Worker, WorkerStatus
+from backend.llm.worker_registry import global_registry
+from backend.llm.worker_pool import WorkerPool
+from backend.llm.worker_client import WorkerAwareOllamaClient
 from backend.schemas.enums import AgentRole
 
 from agents.analysis.agent import AnalysisAgent
@@ -352,7 +356,42 @@ class ExperimentRunner:
             )
 
         try:
-            raw_llm_client = OllamaClient(model_name=repro.model_identifier or "llama3.1")
+            from backend.config import settings
+            import urllib.parse
+            
+            # Use global registry to share state with API
+            registry = global_registry
+            
+            # Setup workers from config or fallback to single-worker
+            if settings.ollama_workers:
+                workers_config = json.loads(settings.ollama_workers)
+                for w_cfg in workers_config:
+                    w = Worker(
+                        worker_id=w_cfg["worker_id"],
+                        host=w_cfg["host"],
+                        port=w_cfg["port"],
+                        model=w_cfg["model"],
+                        capabilities=w_cfg.get("capabilities", []),
+                        status=WorkerStatus.AVAILABLE
+                    )
+                    registry.register_worker(w)
+            else:
+                # Single-worker backward compatibility
+                parsed_url = urllib.parse.urlparse(settings.ollama_base_url)
+                host = parsed_url.hostname or "localhost"
+                port = parsed_url.port or 11434
+                
+                w = Worker(
+                    worker_id="default-worker-1",
+                    host=host,
+                    port=port,
+                    model=repro.model_identifier or settings.ollama_model_general,
+                    status=WorkerStatus.AVAILABLE
+                )
+                registry.register_worker(w)
+            
+            pool = WorkerPool(registry)
+            raw_llm_client = WorkerAwareOllamaClient(worker_pool=pool)
             llm_client = TelemetryLLMClient(raw_llm_client)
             
             # Configure RAG

@@ -14,8 +14,10 @@ def runner():
 
 class TestTelemetry:
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_llm_call_count_with_retry(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    @patch("evaluation.runner.Retriever")
+    @patch("evaluation.runner.OllamaEmbedder")
+    async def test_llm_call_count_with_retry(self, mock_emb, mock_r_cls, mock_worker_client, runner):
         async def mock_analysis_execute(input_val):
             llm = mock_analysis_execute.agent.llm
             # the agent has the TelemetryLLMClient wrapper
@@ -29,9 +31,7 @@ class TestTelemetry:
             
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
-             patch("evaluation.runner.SupervisorAgent") as mock_s, \
-             patch("evaluation.runner.Retriever") as mock_r_cls, \
-             patch("evaluation.runner.OllamaEmbedder"):
+             patch("evaluation.runner.SupervisorAgent") as mock_s:
             
             def mock_analysis_init(*args, **kwargs):
                 mock_a.return_value.llm = kwargs.get("llm_client")
@@ -48,7 +48,7 @@ class TestTelemetry:
             mock_s.return_value.execute.return_value.status = AgentStatus.SUCCESS
             mock_s.return_value.execute.return_value.result = {}
             
-            mock_ollama.return_value.generate_structured_output = AsyncMock()
+            mock_worker_client.return_value.generate_structured_output = AsyncMock()
             mock_r_cls.return_value.retrieve = AsyncMock()
             mock_r_cls.return_value.retrieve.return_value = KnowledgeContext(query="", chunks=[], total_results=0, retrieval_time_ms=0)
             
@@ -57,8 +57,8 @@ class TestTelemetry:
             assert result.llm_calls == 3
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_qa_metrics_extraction(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    async def test_qa_metrics_extraction(self, mock_worker_client, runner):
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
@@ -105,8 +105,8 @@ class TestTelemetry:
             assert result.defect_counts.minor == 3
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_missing_qa_result(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    async def test_missing_qa_result(self, mock_worker_client, runner):
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
@@ -130,8 +130,8 @@ class TestTelemetry:
             assert result.qa_score is None
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_rag_enabled_with_chunks(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    async def test_rag_enabled_with_chunks(self, mock_worker_client, runner):
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
@@ -177,8 +177,8 @@ class TestTelemetry:
             assert result.knowledge_reused is True
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_rag_enabled_zero_chunks(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    async def test_rag_enabled_zero_chunks(self, mock_worker_client, runner):
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
@@ -218,8 +218,8 @@ class TestTelemetry:
             assert result.knowledge_reused is False
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_rag_disabled(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    async def test_rag_disabled(self, mock_worker_client, runner):
         with patch("evaluation.runner.AnalysisAgent") as mock_a, \
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
@@ -241,8 +241,10 @@ class TestTelemetry:
             assert result.knowledge_reused is False
 
     @pytest.mark.asyncio
-    @patch("evaluation.runner.OllamaClient")
-    async def test_telemetry_captures_llm_calls_on_failure(self, mock_ollama, runner):
+    @patch("evaluation.runner.WorkerAwareOllamaClient")
+    @patch("evaluation.runner.Retriever")
+    @patch("evaluation.runner.OllamaEmbedder")
+    async def test_telemetry_captures_llm_calls_on_failure(self, mock_emb, mock_r_cls, mock_worker_client, runner):
         async def mock_analysis_execute(input_val):
             llm = mock_analysis_execute.agent.llm
             await llm.generate_structured_output("sys", "user", MagicMock())
@@ -286,7 +288,7 @@ class TestTelemetry:
             mock_p.return_value.execute = AsyncMock(side_effect=mock_planning_execute)
             mock_planning_execute.agent = mock_p.return_value
             
-            mock_ollama.return_value.generate_structured_output = AsyncMock(side_effect=[MagicMock(), Exception("Timeout")])
+            mock_worker_client.return_value.generate_structured_output = AsyncMock(side_effect=[MagicMock(), Exception("Timeout")])
             mock_r_cls.return_value.retrieve = AsyncMock()
             mock_r_cls.return_value.retrieve.return_value = KnowledgeContext(query="", chunks=[], total_results=0, retrieval_time_ms=0)
             
