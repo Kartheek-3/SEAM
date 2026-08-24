@@ -1,0 +1,285 @@
+[
+  {
+    "iteration": 1,
+    "task_id": "simple-1",
+    "complexity": "simple",
+    "attempts": 1,
+    "final_success": true,
+    "first_attempt_success": true,
+    "retry_recovery": false,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 2990,
+        "duration": 42.223525047302246,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 161
+      }
+    ]
+  },
+  {
+    "iteration": 2,
+    "task_id": "medium-1",
+    "complexity": "medium",
+    "attempts": 1,
+    "final_success": true,
+    "first_attempt_success": true,
+    "retry_recovery": false,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3061,
+        "duration": 90.32726812362671,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 1324
+      }
+    ]
+  },
+  {
+    "iteration": 3,
+    "task_id": "complex-1",
+    "complexity": "complex",
+    "attempts": 2,
+    "final_success": true,
+    "first_attempt_success": false,
+    "retry_recovery": true,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3110,
+        "duration": 80.60211849212646,
+        "timeout": false,
+        "exception_type": "OutputParserException",
+        "parser_result_type": null,
+        "markdown_detected": true,
+        "success": false,
+        "response_size": 1222
+      },
+      {
+        "attempt": 2,
+        "prompt_size": 3507,
+        "duration": 54.62996959686279,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 615
+      }
+    ]
+  },
+  {
+    "iteration": 4,
+    "task_id": "simple-2",
+    "complexity": "simple",
+    "attempts": 1,
+    "final_success": true,
+    "first_attempt_success": true,
+    "retry_recovery": false,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3003,
+        "duration": 27.96074914932251,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 128
+      }
+    ]
+  },
+  {
+    "iteration": 5,
+    "task_id": "medium-2",
+    "complexity": "medium",
+    "attempts": 2,
+    "final_success": true,
+    "first_attempt_success": false,
+    "retry_recovery": true,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3033,
+        "duration": 55.085641384124756,
+        "timeout": false,
+        "exception_type": "OutputParserException",
+        "parser_result_type": null,
+        "markdown_detected": true,
+        "success": false,
+        "response_size": 836
+      },
+      {
+        "attempt": 2,
+        "prompt_size": 3430,
+        "duration": 46.39357256889343,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 447
+      }
+    ]
+  },
+  {
+    "iteration": 6,
+    "task_id": "complex-2",
+    "complexity": "complex",
+    "attempts": 1,
+    "final_success": true,
+    "first_attempt_success": true,
+    "retry_recovery": false,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3070,
+        "duration": 56.042834520339966,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 683
+      }
+    ]
+  },
+  {
+    "iteration": 7,
+    "task_id": "simple-3",
+    "complexity": "simple",
+    "attempts": 2,
+    "final_success": true,
+    "first_attempt_success": false,
+    "retry_recovery": true,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 2981,
+        "duration": 30.580580472946167,
+        "timeout": false,
+        "exception_type": "OutputParserException",
+        "parser_result_type": null,
+        "markdown_detected": true,
+        "success": false,
+        "response_size": 201
+      },
+      {
+        "attempt": 2,
+        "prompt_size": 3378,
+        "duration": 33.91518592834473,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 156
+      }
+    ]
+  },
+  {
+    "iteration": 8,
+    "task_id": "medium-3",
+    "complexity": "medium",
+    "attempts": 1,
+    "final_success": true,
+    "first_attempt_success": true,
+    "retry_recovery": false,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3021,
+        "duration": 51.45177125930786,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 701
+      }
+    ]
+  },
+  {
+    "iteration": 9,
+    "task_id": "complex-3",
+    "complexity": "complex",
+    "attempts": 2,
+    "final_success": true,
+    "first_attempt_success": false,
+    "retry_recovery": true,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3050,
+        "duration": 46.62869596481323,
+        "timeout": false,
+        "exception_type": "OutputParserException",
+        "parser_result_type": null,
+        "markdown_detected": false,
+        "success": false,
+        "response_size": 576
+      },
+      {
+        "attempt": 2,
+        "prompt_size": 3447,
+        "duration": 60.42848515510559,
+        "timeout": false,
+        "exception_type": null,
+        "parser_result_type": "dict",
+        "markdown_detected": false,
+        "success": true,
+        "response_size": 819
+      }
+    ]
+  },
+  {
+    "iteration": 10,
+    "task_id": "complex-4",
+    "complexity": "complex",
+    "attempts": 3,
+    "final_success": false,
+    "first_attempt_success": false,
+    "retry_recovery": false,
+    "calls": [
+      {
+        "attempt": 1,
+        "prompt_size": 3042,
+        "duration": 120.31472396850586,
+        "timeout": true,
+        "exception_type": "TimeoutError",
+        "parser_result_type": null,
+        "markdown_detected": false,
+        "success": false
+      },
+      {
+        "attempt": 2,
+        "prompt_size": 3042,
+        "duration": 120.97113251686096,
+        "timeout": true,
+        "exception_type": "TimeoutError",
+        "parser_result_type": null,
+        "markdown_detected": false,
+        "success": false
+      },
+      {
+        "attempt": 3,
+        "prompt_size": 3042,
+        "duration": 120.98829483985901,
+        "timeout": true,
+        "exception_type": "TimeoutError",
+        "parser_result_type": null,
+        "markdown_detected": false,
+        "success": false
+      }
+    ]
+  }
+]

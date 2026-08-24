@@ -13,6 +13,7 @@ from backend.schemas.artifacts import Artifact
 from backend.schemas.qa import ReworkFeedback
 from agents.coding.prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, REWORK_PROMPT_TEMPLATE
 from agents.coding.exceptions import PathTraversalError, CodeGenerationError
+from backend.llm.client import LLMException
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,44 @@ class CodingAgent(BaseAgent):
         if ".." in parts:
             raise PathTraversalError(f"Path traversal is not allowed: {path}")
 
+    def _build_dependency_context(self, raw_deps: list[dict[str, Any]]) -> str:
+        """
+        Transforms raw dependency outputs into a compact, size-bounded string representation.
+        Prevents large source code payloads from overwhelming the structured JSON LLM prompt.
+        """
+        if not raw_deps:
+            return "[]"
+            
+        compact_deps = []
+        for dep in raw_deps:
+            compact = {
+                "id": dep.get("id"),
+                "name": dep.get("name"),
+                "type": dep.get("type"),
+                "language": dep.get("language")
+            }
+            
+            # Truncate content for code/config artifacts to preserve prompt space
+            if dep.get("type") in ["code", "config", "test"]:
+                content = dep.get("content", "")
+                compact["description"] = f"Artifact content omitted to save space ({len(content)} bytes)"
+            else:
+                content = dep.get("content", "")
+                if len(content) > 500:
+                    compact["content"] = content[:500] + "... (truncated)"
+                else:
+                    compact["content"] = content
+                    
+            compact_deps.append(compact)
+            
+        result = json.dumps(compact_deps, indent=2)
+        
+        # Final safety boundary (e.g. 4000 chars)
+        if len(result) > 4000:
+            return result[:4000] + "\n... (Dependency context strictly truncated to 4000 chars)"
+            
+        return result
+
     def _format_prompt(self, input_data: AgentInput) -> str:
         knowledge_text = ""
         if input_data.knowledge_context and input_data.knowledge_context.chunks:
@@ -56,7 +95,13 @@ class CodingAgent(BaseAgent):
             knowledge_text = "No additional domain knowledge provided."
 
         task_data = json.dumps(input_data.context.get("task_data", {}), indent=2)
-        dep_outputs = json.dumps(input_data.context.get("dependency_outputs", {}), indent=2)
+        
+        raw_deps = input_data.context.get("dependency_outputs", [])
+        if isinstance(raw_deps, dict):
+            # Fallback if wrongly initialized
+            raw_deps = []
+            
+        dep_outputs = self._build_dependency_context(raw_deps)
 
         if input_data.rework_feedback:
             findings_text = "\n".join([f"- [{f.severity.value}] {f.description}" for f in input_data.rework_feedback.qa_result.findings])
@@ -101,7 +146,7 @@ class CodingAgent(BaseAgent):
 
         for attempt in range(max_retries):
             try:
-                response = await self.llm.generate_structured_response(
+                response = await self.llm.generate_structured_output(
                     system_prompt=SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                     response_model=CodeGenerationResponse
@@ -146,6 +191,25 @@ class CodingAgent(BaseAgent):
                 logger.warning(f"Validation error on attempt {attempt + 1}: {e}")
                 last_error = str(e)
                 user_prompt += f"\n\nValidation Error: {last_error}. Please fix this and generate again."
+            except LLMException as e:
+                logger.warning(f"LLM parsing/generation error on attempt {attempt + 1}: {e}")
+                if "timed out" in str(e).lower():
+                    # If it's a timeout, just let the next iteration try normally without appending the huge json block
+                    pass
+                else:
+                    user_prompt += """
+
+Your previous response could not be parsed as the required JSON object.
+Regenerate the response.
+
+STRICT REQUIREMENTS:
+1. Return ONLY one JSON object.
+2. Do NOT use Markdown fences.
+3. Do NOT write ```python.
+4. Do NOT provide explanations.
+5. Every file must be represented inside the JSON files array.
+6. Code must be encoded as a JSON string.
+7. Escape newlines and quotation marks correctly."""
             except Exception as e:
                 logger.error(f"LLM execution failed: {e}")
                 return AgentOutput(

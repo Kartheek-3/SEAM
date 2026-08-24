@@ -1,0 +1,42 @@
+[
+  {
+    "Test": "A",
+    "Output Schema": "Plain text",
+    "Tasks": "N/A",
+    "Prompt Size": 200,
+    "Duration": 72.551766872406,
+    "Result": "SUCCESS"
+  },
+  {
+    "Test": "B",
+    "Output Schema": "Tiny JSON",
+    "Tasks": "N/A",
+    "Prompt Size": 177,
+    "Duration": 16.365463972091675,
+    "Result": "SUCCESS"
+  },
+  {
+    "Test": "C",
+    "Output Schema": "Task",
+    "Tasks": "1",
+    "Prompt Size": 188,
+    "Duration": 82.35698890686035,
+    "Result": "TIMEOUT/FAIL"
+  },
+  {
+    "Test": "D",
+    "Output Schema": "Pass2TaskResult",
+    "Tasks": "1",
+    "Prompt Size": 195,
+    "Duration": 37.72311782836914,
+    "Result": "SUCCESS"
+  },
+  {
+    "Test": "E",
+    "Output Schema": "Pass2TaskResult",
+    "Tasks": "2",
+    "Prompt Size": 196,
+    "Duration": 44.717124938964844,
+    "Result": "SUCCESS"
+  }
+]

@@ -31,7 +31,7 @@ class TestTelemetry:
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
              patch("evaluation.runner.Retriever") as mock_r_cls, \
-             patch("evaluation.runner.EmbeddingClient"):
+             patch("evaluation.runner.OllamaEmbedder"):
             
             def mock_analysis_init(*args, **kwargs):
                 mock_a.return_value.llm = kwargs.get("llm_client")
@@ -63,7 +63,7 @@ class TestTelemetry:
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
              patch("evaluation.runner.Retriever") as mock_r_cls, \
-             patch("evaluation.runner.EmbeddingClient"):
+             patch("evaluation.runner.OllamaEmbedder"):
              
             mock_r_cls.return_value.retrieve = AsyncMock()
             mock_r_cls.return_value.retrieve.return_value = KnowledgeContext(query="", chunks=[], total_results=0, retrieval_time_ms=0)
@@ -111,7 +111,7 @@ class TestTelemetry:
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
              patch("evaluation.runner.Retriever") as mock_r_cls, \
-             patch("evaluation.runner.EmbeddingClient"):
+             patch("evaluation.runner.OllamaEmbedder"):
              
             mock_r_cls.return_value.retrieve = AsyncMock()
             mock_r_cls.return_value.retrieve.return_value = KnowledgeContext(query="", chunks=[], total_results=0, retrieval_time_ms=0)
@@ -136,7 +136,7 @@ class TestTelemetry:
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
              patch("evaluation.runner.Retriever") as mock_retriever_cls, \
-             patch("evaluation.runner.EmbeddingClient"):
+             patch("evaluation.runner.OllamaEmbedder"):
              
             def mock_analysis_init(*args, **kwargs):
                 mock_a.return_value.rag_service = kwargs.get("rag_service")
@@ -183,7 +183,7 @@ class TestTelemetry:
              patch("evaluation.runner.PlanningAgent") as mock_p, \
              patch("evaluation.runner.SupervisorAgent") as mock_s, \
              patch("evaluation.runner.Retriever") as mock_retriever_cls, \
-             patch("evaluation.runner.EmbeddingClient"):
+             patch("evaluation.runner.OllamaEmbedder"):
              
             def mock_analysis_init(*args, **kwargs):
                 mock_a.return_value.rag_service = kwargs.get("rag_service")
@@ -239,3 +239,59 @@ class TestTelemetry:
             assert result.rag_retrievals == 0
             assert result.chunks_retrieved == 0
             assert result.knowledge_reused is False
+
+    @pytest.mark.asyncio
+    @patch("evaluation.runner.OllamaClient")
+    async def test_telemetry_captures_llm_calls_on_failure(self, mock_ollama, runner):
+        async def mock_analysis_execute(input_val):
+            llm = mock_analysis_execute.agent.llm
+            await llm.generate_structured_output("sys", "user", MagicMock())
+            out = MagicMock()
+            out.status = AgentStatus.SUCCESS
+            out.result = {}
+            return out
+
+        async def mock_planning_execute(input_val):
+            llm = mock_planning_execute.agent.llm
+            try:
+                await llm.generate_structured_output("sys", "user", MagicMock())
+            except Exception:
+                pass # Planning catches it and returns FAILURE
+            out = MagicMock()
+            out.status = AgentStatus.FAILURE
+            out.result = {}
+            return out
+
+        with patch("evaluation.runner.AnalysisAgent") as mock_a, \
+             patch("evaluation.runner.PlanningAgent") as mock_p, \
+             patch("evaluation.runner.SupervisorAgent") as mock_s, \
+             patch("evaluation.runner.Retriever") as mock_r_cls, \
+             patch("evaluation.runner.OllamaEmbedder"):
+             
+            def mock_analysis_init(*args, **kwargs):
+                mock_a.return_value.llm = kwargs.get("llm_client")
+                mock_a.return_value.rag_service = kwargs.get("rag_service")
+                return mock_a.return_value
+            mock_a.side_effect = mock_analysis_init
+            
+            def mock_planning_init(*args, **kwargs):
+                mock_p.return_value.llm = kwargs.get("llm_client")
+                mock_p.return_value.rag_service = kwargs.get("rag_service")
+                return mock_p.return_value
+            mock_p.side_effect = mock_planning_init
+            
+            mock_a.return_value.execute = AsyncMock(side_effect=mock_analysis_execute)
+            mock_analysis_execute.agent = mock_a.return_value
+            
+            mock_p.return_value.execute = AsyncMock(side_effect=mock_planning_execute)
+            mock_planning_execute.agent = mock_p.return_value
+            
+            mock_ollama.return_value.generate_structured_output = AsyncMock(side_effect=[MagicMock(), Exception("Timeout")])
+            mock_r_cls.return_value.retrieve = AsyncMock()
+            mock_r_cls.return_value.retrieve.return_value = KnowledgeContext(query="", chunks=[], total_results=0, retrieval_time_ms=0)
+            
+            result = await runner.run("ecommerce-catalog", SystemVariant.FULL_SYSTEM, ResultMode.REAL)
+            
+            assert result.llm_calls == 2
+            assert result.success is False
+            assert result.delivery_status == "Planning Failed"

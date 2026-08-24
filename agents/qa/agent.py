@@ -152,7 +152,7 @@ class QAAgent(BaseAgent):
             except Exception as e:
                 logger.warning(f"Validation error on attempt {attempt + 1}: {e}")
                 last_error = str(e)
-                user_prompt += f"\n\nValidation Error: {last_error}. Please ensure output matches the schema."
+                user_prompt += f"\n\nValidation Error: {last_error}. You MUST return a single JSON object (mapping) matching the schema, not a raw JSON array."
 
         logger.error(f"Task {input_data.task_id}: QA Agent failed to produce valid result after {max_retries} attempts.")
         return AgentOutput(

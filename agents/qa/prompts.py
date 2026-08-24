@@ -7,7 +7,7 @@ Your task is to analyze generated source code artifacts against their required a
 
 Rules:
 1. Identify functional defects, missing acceptance criteria, security vulnerabilities, and bad practices.
-2. Produce a list of structured findings. If the code perfectly matches requirements with no issues, return an empty findings list.
+2. Produce a complete QA evaluation response object containing your list of findings and test metrics. If the code perfectly matches requirements with no issues, return an empty findings list inside the object.
 3. Be strict but pragmatic. Distinguish between 'CRITICAL' bugs and 'MINOR' style issues.
 4. Do NOT invent unsupported requirements. Evaluate only against the provided criteria.
 5. Use the provided Contextual Guidelines ONLY as reference standards to enforce best practices.
@@ -25,5 +25,5 @@ Source Code Artifacts to Review:
 Contextual Guidelines (Security/Quality):
 {knowledge}
 
-Evaluate the source code and return a structured list of quality findings.
+Evaluate the source code and return the structured QA evaluation response object containing findings and test metrics.
 """

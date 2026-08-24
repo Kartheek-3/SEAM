@@ -31,6 +31,7 @@ class AppConfig(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model_coding: str = "deepseek-coder"
     ollama_model_general: str = "llama3.1"
+    ollama_model_embedding: str = "nomic-embed-text"
     ollama_timeout: int = 120
 
     # ChromaDB / RAG

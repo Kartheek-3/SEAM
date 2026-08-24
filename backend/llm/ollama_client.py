@@ -70,11 +70,17 @@ class OllamaClient(LLMClient):
             })
             
             # The JsonOutputParser parses it to a dict. We convert it to the Pydantic model.
+            if not isinstance(result_dict, dict):
+                raise ValueError("LLM output did not parse into a JSON object mapping.")
             return response_model(**result_dict)
             
         except ValidationError as e:
             logger.error(f"Failed to parse LLM output into {response_model.__name__}: {e}")
             raise e
+        except TimeoutError as e:
+            logger.error("LLM generation timed out")
+            raise LLMException("LLM generation timed out") from e
         except Exception as e:
-            logger.error(f"LLM generation failed: {e}")
-            raise LLMException(f"LLM generation failed: {str(e)}")
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logger.error(f"LLM generation failed: {error_msg}")
+            raise LLMException(f"LLM generation failed: {error_msg}")

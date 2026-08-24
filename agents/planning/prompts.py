@@ -2,25 +2,63 @@
 Planning & Design Agent Prompts
 """
 
-SYSTEM_PROMPT = """You are an expert Software Architect and Technical Project Manager.
-Your task is to transform a structured RequirementSpec into an actionable ProjectPlan.
-You must design the system components, select technology, and produce a fully decomposed list of tasks.
+PASS_1_SYSTEM_PROMPT = """You are an expert Software Architect.
+Your task is to transform a structured RequirementSpec into a high-level architectural design.
+You must design the system components and select the technology stack.
 
 CRITICAL DIRECTIVES:
 1. DO NOT invent unsupported features not found in the requirements.
-2. Ensure task dependencies form a valid Directed Acyclic Graph (DAG) without circular dependencies.
-3. Because the schemas are strict, embed Database requirements, API requirements, and Security considerations inside the component 'responsibilities' list or project 'architecture_summary'.
-4. Because the Task schema is strict, embed testable acceptance criteria inside the task 'input_data' dictionary using the key "acceptance_criteria".
-5. Use valid TaskType values: 'analysis', 'planning', 'coding', 'qa', 'delivery'. For general development tasks, use 'coding'.
-6. Every task MUST have a unique string 'id' (e.g. 'T-1', 'T-2').
+2. Embed Database requirements, API requirements, and Security considerations inside the component 'responsibilities' list or project 'architecture_summary'.
+3. DO NOT generate tasks. Output ONLY the architectural summary, technology recommendations, and the components.
+4. Provide concise output without markdown explanations outside the JSON structure.
 """
 
-USER_PROMPT_TEMPLATE = """
-REQUIREMENTS SPECIFICATION (JSON):
+PASS_2_SYSTEM_PROMPT = """You are an expert Technical Project Manager.
+Your task is to decompose a specific architectural component into actionable tasks based on the RequirementSpec.
+
+CRITICAL DIRECTIVES:
+1. DO NOT invent unsupported features not found in the requirements.
+2. Output ONLY tasks for the CURRENT COMPONENT specified.
+3. Every task MUST have a unique string 'local_id' (e.g. 'api-1', 'db-2').
+4. Keep task descriptions concise but include acceptance criteria.
+5. Generate the minimum necessary tasks to fulfill the requirements.
+6. To form dependencies across components, reference ONLY the task IDs listed in the 'EXISTING TASKS CONTEXT' or other local_ids in the current component. Do NOT invent dependency task IDs.
+7. Provide concise output without markdown explanations outside the JSON structure.
+"""
+
+PASS_1_USER_PROMPT_TEMPLATE = """
+COMPACT REQUIREMENTS SPECIFICATION:
 ------------------------
-{requirement_spec}
+{compact_requirements}
 ------------------------
 {knowledge_section}
+SUPERVISOR INSTRUCTIONS:
+{instructions}
+{rework_section}
+"""
+
+PASS_2_USER_PROMPT_TEMPLATE = """
+COMPACT REQUIREMENTS SPECIFICATION:
+------------------------
+{compact_requirements}
+------------------------
+
+SYSTEM ARCHITECTURE SUMMARY:
+------------------------
+{architecture_summary}
+------------------------
+
+EXISTING TASKS CONTEXT:
+(You may reference these task IDs in your dependencies if this component relies on them)
+------------------------
+{existing_tasks_context}
+------------------------
+
+CURRENT COMPONENT TO DECOMPOSE:
+------------------------
+{component_json}
+------------------------
+
 SUPERVISOR INSTRUCTIONS:
 {instructions}
 {rework_section}

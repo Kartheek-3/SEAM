@@ -120,3 +120,28 @@ async def test_malformed_json_retry_and_failure(agent):
     assert out.status == AgentStatus.FAILURE
     assert agent.llm.call_count == 3
     assert "QA evaluation failed due to malformed LLM responses" in out.feedback
+
+@pytest.mark.asyncio
+async def test_qa_retry_recovery(agent):
+    class RecoveringMockLLM(MockLLM):
+        async def generate_structured_response(self, system_prompt: str, user_prompt: str, response_model: type) -> Any:
+            self.call_count += 1
+            self.last_prompt = user_prompt
+            if self.call_count == 1:
+                raise ValueError("LLM output did not parse into a JSON object mapping.")
+            
+            return QAEvaluationResponse(
+                findings=[],
+                tests_passed=1,
+                tests_failed=0,
+                tests_total=1,
+                recommendations=["Fixed on attempt 2"]
+            )
+            
+    agent.llm = RecoveringMockLLM()
+    out = await agent.execute(create_input())
+    
+    assert out.status == AgentStatus.SUCCESS
+    assert agent.llm.call_count == 2
+    assert "LLM output did not parse into a JSON object mapping." in agent.llm.last_prompt
+    assert "You MUST return a single JSON object (mapping) matching the schema" in agent.llm.last_prompt

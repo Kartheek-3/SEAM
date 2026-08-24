@@ -6,7 +6,7 @@ from langgraph.graph import StateGraph, END
 
 from agents.base import BaseAgent, RAGService
 from backend.schemas.workflow import WorkflowState
-from backend.schemas import TaskType, AgentInput, AgentOutput, AgentStatus, AgentRole
+from backend.schemas import TaskType, AgentInput, AgentOutput, AgentStatus, AgentRole, Task
 from backend.schemas.planning import ProjectPlan
 from agents.supervisor.exceptions import AgentNotFoundError, WorkflowDeadlockError
 
@@ -48,6 +48,62 @@ class SupervisorAgent(BaseAgent):
 
     def _initialize_state(self, plan: ProjectPlan) -> WorkflowState:
         tasks_dict = {t.id: t for t in plan.tasks}
+        
+        # Phase 9D.15: Synthesize workflow-level QA and Delivery tasks —
+        # but ONLY for CODING tasks that don't already have an explicit QA task
+        # pointing to them, and only if no explicit DELIVERY task already exists.
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        coding_task_ids = [t.id for t in plan.tasks if t.type == TaskType.CODING]
+        
+        # Build set of CODING task IDs that already have an explicit QA dependent
+        already_covered_by_qa = set()
+        for t in plan.tasks:
+            if t.type == TaskType.QA:
+                for dep in t.dependencies:
+                    if dep in tasks_dict and tasks_dict[dep].type == TaskType.CODING:
+                        already_covered_by_qa.add(dep)
+        
+        # Check whether the plan already has an explicit DELIVERY task
+        has_explicit_delivery = any(t.type == TaskType.DELIVERY for t in plan.tasks)
+        
+        qa_task_ids = []
+        for c_id in coding_task_ids:
+            if c_id in already_covered_by_qa:
+                # An explicit QA task already covers this coding task — don't double-synthesize
+                continue
+            c_task = tasks_dict[c_id]
+            qa_id = f"qa-{c_id}"
+            qa_task = Task(
+                id=qa_id,
+                project_id=plan.project_id,
+                title=f"QA for {c_task.title}",
+                description=f"Evaluate code artifacts against requirements for task {c_id}.",
+                type=TaskType.QA,
+                dependencies=[c_id],
+                priority=1,
+                created_at=now
+            )
+            tasks_dict[qa_id] = qa_task
+            qa_task_ids.append(qa_id)
+            
+        # Only synthesize delivery-global when:
+        # - There are newly synthesized QA tasks (meaning there are uncovered coding tasks), AND
+        # - The plan doesn't already have an explicit DELIVERY task
+        if qa_task_ids and not has_explicit_delivery:
+            delivery_task = Task(
+                id="delivery-global",
+                project_id=plan.project_id,
+                title="Final Delivery",
+                description="Generate deployment documentation and Dockerfile.",
+                type=TaskType.DELIVERY,
+                dependencies=qa_task_ids,
+                priority=0,
+                created_at=now
+            )
+            tasks_dict[delivery_task.id] = delivery_task
+
         return {
             "project_id": plan.project_id,
             "current_phase": "TASK_DISPATCH",
@@ -192,9 +248,16 @@ class SupervisorAgent(BaseAgent):
         for dep in task.dependencies:
             if dep in state["agent_outputs"]:
                 out = state["agent_outputs"][dep]
-                dep_outputs.extend([a.model_dump() for a in out.artifacts])
+                dep_outputs.extend([a.model_dump(mode='json') for a in out.artifacts])
                 if state["tasks"][dep].type == TaskType.QA:
                     qa_result = out.result
+                    
+                    # Phase 9D.16: Traverse backwards to grab the corresponding Coding artifacts for Delivery
+                    for qa_dep in state["tasks"][dep].dependencies:
+                        if qa_dep in state["agent_outputs"] and state["tasks"][qa_dep].type == TaskType.CODING:
+                            coding_out = state["agent_outputs"][qa_dep]
+                            dep_outputs.extend([a.model_dump(mode='json') for a in coding_out.artifacts])
+                            
                 elif state["tasks"][dep].type == TaskType.ANALYSIS:
                     qa_result = out.result # Just in case it's requirement spec, wait no, requirement spec is passed differently.
                 
@@ -255,8 +318,16 @@ class SupervisorAgent(BaseAgent):
                                         state["pending_tasks"].append(t.id)
                         else:
                             logger.warning(f"QA failed for {source_id}. Max rework attempts exceeded.")
-                            state["completed_tasks"].remove(source_id)
-                            state["failed_tasks"].append(source_id)
+                            if source_id in state["completed_tasks"]:
+                                state["completed_tasks"].remove(source_id)
+                            if source_id not in state["failed_tasks"]:
+                                state["failed_tasks"].append(source_id)
+                            
+                            # Phase 9D.16: Ensure QA task is also marked as failed to block dependents (like Delivery)
+                            if task_id in state["completed_tasks"]:
+                                state["completed_tasks"].remove(task_id)
+                            if task_id not in state["failed_tasks"]:
+                                state["failed_tasks"].append(task_id)
         else:
             # Agent explicitly failed (e.g. timeout)
             current_rework = state["rework_counts"].get(task_id, 0)

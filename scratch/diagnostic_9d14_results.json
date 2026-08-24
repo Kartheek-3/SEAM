@@ -1,0 +1,133 @@
+{
+  "baseline": {
+    "health_ok": true,
+    "msg": "OK",
+    "latency": 0.2634556293487549,
+    "tcp_ok": true,
+    "timestamp": 1787235589.8574593
+  },
+  "sequential": [
+    {
+      "attempt": 1,
+      "duration": 27.220858812332153,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.26410913467407227
+    },
+    {
+      "attempt": 2,
+      "duration": 20.87501811981201,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.2657899856567383
+    },
+    {
+      "attempt": 3,
+      "duration": 45.7853581905365,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.26903390884399414
+    },
+    {
+      "attempt": 4,
+      "duration": 17.908727407455444,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.2610306739807129
+    },
+    {
+      "attempt": 5,
+      "duration": 17.25822687149048,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.26513123512268066
+    },
+    {
+      "attempt": 6,
+      "duration": 15.278048515319824,
+      "success": false,
+      "exc_type": "LLMException",
+      "exc_msg": "LLM generation failed: OutputParserException: Invalid json output: ```python\nfrom fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/\")\ndef read_root():\n    return {\"summary\": \"This is a summary.\"}\n```\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langchain/errors/OUTPUT_PARSING_FAILURE ",
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.26699137687683105
+    },
+    {
+      "attempt": 7,
+      "duration": 18.2779541015625,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.26172590255737305
+    },
+    {
+      "attempt": 8,
+      "duration": 16.928765773773193,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.2746288776397705
+    },
+    {
+      "attempt": 9,
+      "duration": 56.395859479904175,
+      "success": false,
+      "exc_type": "LLMException",
+      "exc_msg": "LLM generation failed: OutputParserException: Invalid json output: ```python\nimport numpy as np\n\ndef matrix_multiplication(matrix_a, matrix_b):\n    \"\"\"\n    This function performs matrix multiplication on two input matrices.\n    \n    Args:\n        matrix_a (list): The first input matrix.\n        matrix_b (list): The second input matrix.\n    \n    Returns:\n        list: The result of the matrix multiplication.\n    \"\"\"\n    \n    # Check if the input matrices can be multiplied\n    if len(matrix_a[0]) != len(matrix_b):\n        raise ValueError(\"The number of columns in the first matrix must be equal to the number of rows in the second matrix.\")\n    \n    # Initialize the result matrix with zeros\n    result = [[0 for _ in range(len(matrix_b[0]))] for _ in range(len(matrix_a))]\n    \n    # Perform the matrix multiplication\n    for i in range(len(matrix_a)):\n        for j in range(len(matrix_b[0])):\n            for k in range(len(matrix_b)):\n                result[i][j] += matrix_a[i][k] * matrix_b[k][j]\n    \n    return result\n\n# Example usage:\nmatrix_a = [[1, 2], [3, 4]]\nmatrix_b = [[5, 6], [7, 8]]\n\nresult = matrix_multiplication(matrix_a, matrix_b)\n\n# Print the result as a JSON instance\nprint({\"summary\": \"Matrix multiplication result: \" + str(result)})\n```\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langchain/errors/OUTPUT_PARSING_FAILURE ",
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.275301456451416
+    },
+    {
+      "attempt": 10,
+      "duration": 46.008586406707764,
+      "success": true,
+      "exc_type": null,
+      "exc_msg": null,
+      "post_probe_ok": true,
+      "post_probe_msg": "OK",
+      "post_probe_tcp": true,
+      "post_probe_latency": 0.2596151828765869
+    }
+  ],
+  "sustained": [],
+  "overall": {
+    "total_requests": 10,
+    "successful": 8,
+    "failed": 2,
+    "timeouts": 0,
+    "connection_failures": 0,
+    "mean_latency": 26.282936960458755,
+    "median_latency": 19.576486110687256,
+    "p95_latency": 46.13136192560196,
+    "max_latency": 46.008586406707764
+  }
+}

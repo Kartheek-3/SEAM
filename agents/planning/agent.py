@@ -1,15 +1,20 @@
 import json
 import logging
 import time
-from typing import Any
+import uuid
+from datetime import datetime, timezone
+from typing import Any, List
 
 from pydantic import ValidationError
 
 from agents.base import BaseAgent, RAGService
 from agents.planning.exceptions import EmptyRequirementSpecError, CircularDependencyError
+from agents.planning.internal_schemas import Pass1ArchitectureResult, Pass2TaskResult
 from agents.planning.prompts import (
-    SYSTEM_PROMPT,
-    USER_PROMPT_TEMPLATE,
+    PASS_1_SYSTEM_PROMPT,
+    PASS_2_SYSTEM_PROMPT,
+    PASS_1_USER_PROMPT_TEMPLATE,
+    PASS_2_USER_PROMPT_TEMPLATE,
     REWORK_SECTION_TEMPLATE,
     KNOWLEDGE_SECTION_TEMPLATE
 )
@@ -21,7 +26,8 @@ from backend.schemas import (
     AgentRole,
     Task
 )
-from backend.schemas.planning import ProjectPlan
+from backend.schemas.enums import TaskType, TaskStatus
+from backend.schemas.planning import ProjectPlan, ComponentSpec
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +35,7 @@ class PlanningAgent(BaseAgent):
     """
     Planning & Design Agent.
     Transforms a RequirementSpec into a ProjectPlan containing actionable tasks.
+    Utilizes a Two-Pass Architecture to avoid timeout constraints.
     """
 
     def __init__(self, llm_client: LLMClient, rag_service: RAGService | None = None):
@@ -46,15 +53,27 @@ class PlanningAgent(BaseAgent):
             if not requirement_spec_dict:
                 raise EmptyRequirementSpecError("RequirementSpec is missing from context.")
             
-            req_spec_json = json.dumps(requirement_spec_dict, indent=2)
+            # Construct a COMPACT planning input to avoid token bloat
+            functional_reqs = requirement_spec_dict.get("functional_requirements", [])
+            non_functional_reqs = requirement_spec_dict.get("non_functional_requirements", [])
+            
+            compact_reqs = []
+            for fr in functional_reqs:
+                compact_reqs.append(f"- {fr.get('id', '')}: {fr.get('description', '')} ({fr.get('priority', 'must')})")
+            for nfr in non_functional_reqs:
+                compact_reqs.append(f"- {nfr.get('id', '')}: {nfr.get('description', '')} ({nfr.get('priority', 'must')})")
+                
+            compact_req_text = "\n".join(compact_reqs)
+            
+            project_id = input.context.get("project_id", "unknown")
 
-            # 2. RAG Retrieval
+            # 2. RAG Retrieval (Pass 1 Only)
             knowledge_section = ""
             if self.rag_service:
                 logger.info(f"Task {task_id}: Attempting RAG retrieval for architecture context")
                 try:
                     # Querying RAG based on the raw project_id and key requirements
-                    query_str = f"Architecture patterns for project {input.context.get('project_id', '')}"
+                    query_str = f"Architecture patterns for project {project_id}"
                     rag_context = await self.rag_service.retrieve(query=query_str)
                     if rag_context and rag_context.chunks:
                         logger.info(f"Task {task_id}: Retrieved {len(rag_context.chunks)} chunks in {rag_context.retrieval_time_ms}ms")
@@ -65,7 +84,7 @@ class PlanningAgent(BaseAgent):
                 except Exception as e:
                     logger.error(f"Task {task_id}: RAG retrieval failed: {e}")
 
-            # 3. Build Prompts
+            # 3. Build Rework Section
             rework_section = ""
             if input.rework_feedback:
                 findings_str = "\\n".join(
@@ -77,15 +96,68 @@ class PlanningAgent(BaseAgent):
                     focus_areas=", ".join(input.rework_feedback.focus_areas) + f"\\n\\nQA Findings:\\n{findings_str}"
                 )
 
-            user_prompt = USER_PROMPT_TEMPLATE.format(
-                requirement_spec=req_spec_json,
+            # 4. Pass 1: Architecture
+            pass1_user_prompt = PASS_1_USER_PROMPT_TEMPLATE.format(
+                compact_requirements=compact_req_text,
                 knowledge_section=knowledge_section,
                 instructions=input.instructions,
                 rework_section=rework_section
             )
-
-            # 4. LLM Invocation & Graph Validation Loop
-            project_plan = await self._generate_with_retries(user_prompt, input.context.get("project_id", "unknown"))
+            
+            pass1_result = await self._run_pass1(pass1_user_prompt)
+            
+            # 5. Pass 2: Task Decomposition per Component
+            all_assembled_tasks: List[Task] = []
+            
+            for component in pass1_result.components:
+                pass2_result = await self._run_pass2_for_component(
+                    compact_req_text=compact_req_text,
+                    architecture_summary=pass1_result.architecture_summary,
+                    component=component,
+                    existing_tasks=all_assembled_tasks,
+                    instructions=input.instructions,
+                    rework_section=rework_section,
+                    project_id=project_id
+                )
+                
+                # Map MinimalTask to official Task
+                local_id_to_uuid = {
+                    mt.local_id: str(uuid.uuid4()) for mt in pass2_result.tasks
+                }
+                
+                for mt in pass2_result.tasks:
+                    mapped_deps = []
+                    for dep in mt.depends_on:
+                        if dep in local_id_to_uuid:
+                            mapped_deps.append(local_id_to_uuid[dep])
+                        else:
+                            # Assume it's a UUID from existing_tasks_context
+                            mapped_deps.append(dep)
+                            
+                    new_task = Task(
+                        id=local_id_to_uuid[mt.local_id],
+                        project_id=project_id,
+                        title=mt.title,
+                        description=mt.description,
+                        type=TaskType.CODING, # Default safe deterministic value
+                        status=TaskStatus.PENDING,
+                        dependencies=mapped_deps,
+                        created_at=datetime.now(timezone.utc)
+                    )
+                    all_assembled_tasks.append(new_task)
+                
+            # 6. Final Assembly
+            project_plan = ProjectPlan(
+                project_id=project_id,
+                architecture_summary=pass1_result.architecture_summary,
+                technology_recommendations=pass1_result.technology_recommendations,
+                components=pass1_result.components,
+                tasks=all_assembled_tasks
+            )
+            logger.info(f"Task {task_id}: Generated {len(project_plan.components)} components and {len(project_plan.tasks)} tasks.")
+            
+            # 7. Final DFS Dependency Validation
+            self._validate_task_dependencies(project_plan.tasks)
 
             # Calculate confidence heuristically based on the richness of tasks
             confidence = min(0.95, 0.5 + (len(project_plan.tasks) * 0.05))
@@ -123,50 +195,91 @@ class PlanningAgent(BaseAgent):
                 execution_time_ms=int((time.time() - start_time) * 1000)
             )
 
-    async def _generate_with_retries(self, user_prompt: str, project_id: str, max_retries: int = 3) -> ProjectPlan:
-        """Invokes the LLM and handles schema/graph validation retries."""
+    async def _run_pass1(self, user_prompt: str, max_retries: int = 3) -> Pass1ArchitectureResult:
+        start_time = time.time()
         current_prompt = user_prompt
-
         for attempt in range(max_retries):
             try:
-                plan = await self.llm.generate_structured_output(
-                    system_prompt=SYSTEM_PROMPT,
+                result = await self.llm.generate_structured_output(
+                    system_prompt=PASS_1_SYSTEM_PROMPT,
                     user_prompt=current_prompt,
-                    response_model=ProjectPlan
+                    response_model=Pass1ArchitectureResult
+                )
+                duration = time.time() - start_time
+                logger.info(f"Pass 1 completed in {duration:.2f}s after {attempt + 1} attempts.")
+                return result
+            except ValidationError as e:
+                logger.warning(f"Pass 1 Schema validation failed on attempt {attempt + 1}: {e}")
+                if attempt == max_retries - 1:
+                    raise Exception(f"Failed to generate Pass1ArchitectureResult after {max_retries} attempts. Last error: {e}")
+                current_prompt += f"\\n\\n[SYSTEM: Your previous Pass 1 output failed schema validation. Error:\\n{e}\\nPlease correct the JSON format.]"
+            except LLMException as e:
+                logger.error(f"Pass 1 LLM failure on attempt {attempt + 1}/{max_retries}:\n{e}. Retrying.")
+                if attempt == max_retries - 1:
+                    raise
+        raise Exception("Unexpected exit from Pass 1 retry loop.")
+
+    async def _run_pass2_for_component(
+        self,
+        compact_req_text: str,
+        architecture_summary: str,
+        component: ComponentSpec,
+        existing_tasks: List[Task],
+        instructions: str,
+        rework_section: str,
+        project_id: str,
+        max_retries: int = 3
+    ) -> Pass2TaskResult:
+        
+        # Build compact context of existing tasks to allow valid cross-component dependencies
+        existing_tasks_context = "\\n".join([f"Task ID: {t.id} - {t.title}" for t in existing_tasks])
+        if not existing_tasks_context:
+            existing_tasks_context = "No previous tasks exist yet."
+            
+        component_json = component.model_dump_json(indent=2)
+        
+        user_prompt = PASS_2_USER_PROMPT_TEMPLATE.format(
+            compact_requirements=compact_req_text,
+            architecture_summary=architecture_summary,
+            existing_tasks_context=existing_tasks_context,
+            component_json=component_json,
+            instructions=instructions,
+            rework_section=rework_section
+        )
+        
+        start_time = time.time()
+        current_prompt = user_prompt
+        for attempt in range(max_retries):
+            try:
+                result = await self.llm.generate_structured_output(
+                    system_prompt=PASS_2_SYSTEM_PROMPT,
+                    user_prompt=current_prompt,
+                    response_model=Pass2TaskResult
                 )
                 
-                # Fix up project IDs in generated tasks
-                for task in plan.tasks:
-                    if not task.project_id:
-                        task.project_id = project_id
-                
-                # Graph Validation (Cycle Detection)
-                self._validate_task_dependencies(plan.tasks)
-
-                return plan
-
+                # project_id normalization is now handled in the mapper in execute()
+                        
+                duration = time.time() - start_time
+                logger.info(f"Pass 2 for component '{component.name}' completed in {duration:.2f}s after {attempt + 1} attempts.")
+                return result
             except ValidationError as e:
-                logger.warning(f"Schema validation failed on attempt {attempt + 1}: {e}")
+                logger.warning(f"Pass 2 Schema validation failed on attempt {attempt + 1} for component '{component.name}': {e}")
                 if attempt == max_retries - 1:
-                    raise Exception(f"Failed to generate valid ProjectPlan after {max_retries} attempts. Last error: {e}")
-                
-                # Append error to prompt for next attempt
-                current_prompt += f"\\n\\n[SYSTEM: Your previous output failed schema validation. Error:\\n{e}\\nPlease correct the JSON format.]"
-            except CircularDependencyError as e:
-                logger.warning(f"Circular dependency detected on attempt {attempt + 1}: {e}")
-                if attempt == max_retries - 1:
-                    raise Exception(f"Failed to generate acyclic task graph after {max_retries} attempts. Last error: {e}")
-                
-                current_prompt += f"\\n\\n[SYSTEM: Your previous output contained a circular task dependency or invalid reference. Error:\\n{e}\\nPlease correct the 'dependencies' fields.]"
+                    raise Exception(f"Failed to generate Pass2TaskResult for component '{component.name}' after {max_retries} attempts. Last error: {e}")
+                current_prompt += f"\\n\\n[SYSTEM: Your previous Pass 2 output failed schema validation. Error:\\n{e}\\nPlease correct the JSON format.]"
             except LLMException as e:
-                logger.error(f"LLM API failed on attempt {attempt + 1}: {e}")
-                raise
-
-        raise Exception("Unexpected exit from retry loop.")
+                logger.error(f"Pass 2 component '{component.name}' LLM failure on attempt {attempt + 1}/{max_retries}:\n{e}. Retrying.")
+                if attempt == max_retries - 1:
+                    raise
+        raise Exception("Unexpected exit from Pass 2 retry loop.")
 
     def _validate_task_dependencies(self, tasks: list[Task]) -> None:
         """Validates that all dependencies exist and form a DAG without cycles."""
-        task_ids = {t.id for t in tasks}
+        task_ids = set()
+        for t in tasks:
+            if t.id in task_ids:
+                raise CircularDependencyError(f"Duplicate task ID detected: '{t.id}'")
+            task_ids.add(t.id)
         
         # Build adjacency list: dep -> task
         graph = {t_id: [] for t_id in task_ids}

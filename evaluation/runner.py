@@ -43,7 +43,7 @@ from agents.qa.agent import QAAgent
 from agents.delivery.agent import DeliveryAgent
 from agents.supervisor.agent import SupervisorAgent
 from rag.retriever import Retriever
-from rag.embedder import EmbeddingClient
+from backend.llm.ollama_embedder import OllamaEmbedder
 from rag.config import COLLECTION_VALIDATED_KNOWLEDGE
 
 from backend.llm.client import LLMClient
@@ -53,13 +53,19 @@ from typing import Type, TypeVar
 
 T = TypeVar("T", bound=BaseModel)
 
-class TelemetryLLMClient(LLMClient):
+class TelemetryLLMClient:
     def __init__(self, base_client: LLMClient):
         self.base_client = base_client
         self.invocation_count = 0
     
     async def generate_structured_output(self, system_prompt: str, user_prompt: str, response_model: Type[T]) -> T:
         self.invocation_count += 1
+        return await self.base_client.generate_structured_output(system_prompt, user_prompt, response_model)
+
+    async def generate_structured_response(self, system_prompt: str, user_prompt: str, response_model: Type[T]) -> T:
+        self.invocation_count += 1
+        if hasattr(self.base_client, "generate_structured_response"):
+            return await self.base_client.generate_structured_response(system_prompt, user_prompt, response_model)
         return await self.base_client.generate_structured_output(system_prompt, user_prompt, response_model)
 
 class TelemetryRAGService:
@@ -345,17 +351,21 @@ class ExperimentRunner:
                 reproducibility=repro,
             )
 
-        raw_llm_client = OllamaClient(model_name=repro.model_identifier or "llama3.1")
-        llm_client = TelemetryLLMClient(raw_llm_client)
-        
-        # Configure RAG
-        rag_service = None
-        if variant != SystemVariant.BASELINE_C_NO_RAG:
-            raw_rag = Retriever(embedder=EmbeddingClient())
-            rag_service = TelemetryRAGService(raw_rag)
-            # For cold start, point to a non-existent/empty collection
-            if variant == SystemVariant.VARIANT_COLD_START:
-                rag_service.chroma.get_or_create_collection(f"cold_start_{experiment_id}")
+        try:
+            raw_llm_client = OllamaClient(model_name=repro.model_identifier or "llama3.1")
+            llm_client = TelemetryLLMClient(raw_llm_client)
+            
+            # Configure RAG
+            rag_service = None
+            if variant != SystemVariant.BASELINE_C_NO_RAG:
+                raw_rag = Retriever(embedder=OllamaEmbedder())
+                rag_service = TelemetryRAGService(raw_rag)
+                # For cold start, point to a non-existent/empty collection
+                if variant == SystemVariant.VARIANT_COLD_START:
+                    rag_service.chroma.get_or_create_collection(f"cold_start_{experiment_id}")
+        except Exception as e:
+            logger.error(f"Failed to initialize evaluation components: {e}")
+            return self._build_failed_real_result(experiment_id, scenario, variant, repro, f"Component Initialization Failed: {e}")
 
         # 1. Analysis
         analysis_agent = AnalysisAgent(llm_client=llm_client, rag_service=rag_service)
@@ -368,7 +378,7 @@ class ExperimentRunner:
         analysis_out = await analysis_agent.execute(analysis_in)
         
         if analysis_out.status != AgentStatus.SUCCESS:
-            return self._build_failed_real_result(experiment_id, scenario, variant, repro, "Analysis Failed")
+            return self._build_failed_real_result(experiment_id, scenario, variant, repro, "Analysis Failed", llm_client, rag_service)
 
         # 2. Planning
         planning_agent = PlanningAgent(llm_client=llm_client, rag_service=rag_service)
@@ -381,7 +391,7 @@ class ExperimentRunner:
         planning_out = await planning_agent.execute(planning_in)
         
         if planning_out.status != AgentStatus.SUCCESS:
-            return self._build_failed_real_result(experiment_id, scenario, variant, repro, "Planning Failed")
+            return self._build_failed_real_result(experiment_id, scenario, variant, repro, "Planning Failed", llm_client, rag_service)
 
         # 3. Supervisor (Coding, QA, Delivery)
         registry = {
@@ -457,7 +467,7 @@ class ExperimentRunner:
             task_completion_rate=1.0 if success else 0.5,
         )
 
-    def _build_failed_real_result(self, exp_id, scenario, variant, repro, reason):
+    def _build_failed_real_result(self, exp_id, scenario, variant, repro, reason, llm_client=None, rag_service=None):
         return ExperimentResult(
             experiment_id=exp_id,
             scenario_id=scenario.scenario_id,
@@ -465,9 +475,22 @@ class ExperimentRunner:
             model=repro.model_identifier,
             domain=scenario.domain,
             success=False,
+            llm_calls=llm_client.invocation_count if llm_client else 0,
+            rework_cycles=0,
+            qa_score=None,
+            defect_counts=DefectCounts(critical=0, major=0, minor=0),
             delivery_status=reason,
+            rag_used=(rag_service is not None),
+            rag_retrievals=rag_service.retrievals if rag_service else 0,
+            rag_successes=rag_service.successes if rag_service else 0,
+            rag_failures=rag_service.failures if rag_service else 0,
+            chunks_retrieved=rag_service.chunks_retrieved if rag_service else 0,
+            rag_latency_ms=rag_service.latency_ms if rag_service else 0,
+            knowledge_reused=(rag_service is not None and rag_service.chunks_retrieved > 0),
             result_mode=ResultMode.REAL,
             reproducibility=repro,
+            agent_failure_count=1,
+            task_completion_rate=0.0,
         )
 
     def _persist_result(self, result: ExperimentResult) -> str:

@@ -23,7 +23,7 @@ class MockLLM:
         self.call_count = 0
         self.last_prompt = ""
 
-    async def generate_structured_response(self, system_prompt: str, user_prompt: str, response_model: type) -> Any:
+    async def generate_structured_output(self, system_prompt: str, user_prompt: str, response_model: type) -> Any:
         self.call_count += 1
         self.last_prompt = user_prompt
         if self.raise_error:
@@ -128,3 +128,41 @@ async def test_rework_integration(agent):
     assert "QA REWORK FEEDBACK" in agent.llm.last_prompt
     assert "Missing tests" in agent.llm.last_prompt
     assert "Add tests" in agent.llm.last_prompt
+
+@pytest.mark.asyncio
+async def test_dependency_context_reduction(agent):
+    large_code = "x = 1\n" * 500  # 3000 chars
+    deps = [
+        {"id": "a1", "name": "main.py", "type": "code", "content": large_code, "language": "python"},
+        {"id": "a2", "name": "reqs.txt", "type": "config", "content": "flask\n" * 200, "language": "text"},
+        {"id": "a3", "name": "design.md", "type": "document", "content": "design\n" * 100, "language": "markdown"}
+    ]
+    
+    out = await agent.execute(create_input(context={"project_id": "p-1", "dependency_outputs": deps}))
+    assert out.status == AgentStatus.SUCCESS
+    
+    prompt = agent.llm.last_prompt
+    
+    # Assert code content is strictly removed
+    assert "x = 1" not in prompt
+    assert "Artifact content omitted to save space (3000 bytes)" in prompt
+    
+    # Assert config content is strictly removed
+    assert "flask" not in prompt
+    assert "Artifact content omitted to save space (1200 bytes)" in prompt
+    
+    # Assert document content is truncated at 500 chars
+    assert "design\\n" * 70 in prompt # First 490 chars
+    assert "truncated" in prompt
+    
+    # Ensure standard schema parsing succeeded
+    assert out.artifacts[0].name == "src/main.py"
+
+@pytest.mark.asyncio
+async def test_dependency_context_size_limit(agent):
+    deps = [{"id": f"a{i}", "name": f"f{i}.md", "type": "document", "content": "X" * 600} for i in range(10)]
+    out = await agent.execute(create_input(context={"project_id": "p-1", "dependency_outputs": deps}))
+    assert out.status == AgentStatus.SUCCESS
+    
+    prompt = agent.llm.last_prompt
+    assert "Dependency context strictly truncated to 4000 chars" in prompt

@@ -534,7 +534,7 @@ class TestRealRunner:
     @pytest.mark.asyncio
     @patch("evaluation.runner.OllamaClient")
     @patch("evaluation.runner.Retriever")
-    @patch("evaluation.runner.EmbeddingClient")
+    @patch("evaluation.runner.OllamaEmbedder")
     async def test_real_run_successful(self, mock_emb, mock_rag, mock_ollama, runner):
         # Setup mocks
         mock_client = MagicMock()

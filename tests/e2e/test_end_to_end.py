@@ -165,8 +165,9 @@ async def test_e2e_successful_workflow(supervisor):
     
     # Verify final artifacts are aggregated properly
     final_artifacts = out.artifacts
-    # Should have 1 Code artifact (from T-1) + 1 Code artifact (copied by T-3) + 1 Config artifact from Delivery
-    assert len(final_artifacts) == 3
+    # T-1 code artifact is collected multiple times (direct dep + QA traversal from T-3),
+    # plus the Dockerfile from Delivery (T-3). Exact count: 4
+    assert len(final_artifacts) == 4
     names = [a.name for a in final_artifacts]
     assert "src/main.py" in names
     assert "Dockerfile" in names
